@@ -1,0 +1,151 @@
+## 🔧 **AIアシスタント成果物 永続保存・共有設定 指示書**
+
+### 1️⃣ JSON保存エラー対策
+
+AIの出力JSONに日本語が混入すると
+
+> Unexpected token '企' ... is not valid JSON
+> が発生するため、以下のように `JSON.stringify()` を徹底すること。
+
+```js
+const body = JSON.stringify({
+  company_name: "フォーティエンスコンサルティング株式会社",
+  contact_person: "伊藤",
+  email: "somu@fortience.com"
+});
+```
+
+---
+
+### 2️⃣ Supabase テーブル構造補完
+
+不足カラムやschema cacheエラーを防ぐ。
+
+```sql
+BEGIN;
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE IF NOT EXISTS public.customers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+);
+
+ALTER TABLE public.customers
+  ADD COLUMN IF NOT EXISTS company_name text,
+  ADD COLUMN IF NOT EXISTS representative text,
+  ADD COLUMN IF NOT EXISTS phone_number text,
+  ADD COLUMN IF NOT EXISTS email text,
+  ADD COLUMN IF NOT EXISTS website_url text,
+  ADD COLUMN IF NOT EXISTS address1 text,
+  ADD COLUMN IF NOT EXISTS address2 text,
+  ADD COLUMN IF NOT EXISTS ai_analysis jsonb,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+```
+
+---
+
+### 3️⃣ AI生成物 永続保存テーブル作成
+
+提案書・見積・返信などを一元管理し、**誰でも閲覧可能**に設定。
+
+```sql
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public.ai_artifacts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind text NOT NULL,                 -- research|proposal|estimate|mail
+  title text NOT NULL,
+  lead_id uuid,
+  customer_id uuid,
+  body_md text,                       -- 本文(MD/JSON)
+  storage_path text,                  -- 添付ファイルパス
+  status text DEFAULT 'ready',
+  created_by uuid,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE OR REPLACE FUNCTION public.touch_updated_at()
+RETURNS trigger AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_touch_ai_artifacts ON public.ai_artifacts;
+CREATE TRIGGER trg_touch_ai_artifacts
+BEFORE UPDATE ON public.ai_artifacts
+FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+ALTER TABLE public.ai_artifacts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY ai_artifacts_read_all
+  ON public.ai_artifacts FOR SELECT TO authenticated USING (true);
+CREATE POLICY ai_artifacts_write_all
+  ON public.ai_artifacts FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY ai_artifacts_write_all_update
+  ON public.ai_artifacts FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+
+-- 公開バケット
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('ai','ai', true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY ai_read_public
+  ON storage.objects FOR SELECT USING (bucket_id = 'ai');
+CREATE POLICY ai_write_auth
+  ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'ai');
+CREATE POLICY ai_update_auth
+  ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'ai') WITH CHECK (bucket_id = 'ai');
+
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+```
+
+---
+
+### 4️⃣ 保存処理例
+
+```ts
+// 企業調査結果を保存
+await supabase.from('ai_artifacts').insert({
+  kind: 'research',
+  title: '企業調査: フォーティエンス',
+  lead_id,
+  customer_id,
+  body_md: researchMarkdown,
+  created_by: user.id
+});
+
+// 提案書PDFを保存
+const filePath = `ai/${lead_id}/proposal_${Date.now()}.pdf`;
+await supabase.storage.from('ai').upload(filePath, fileBlob, { upsert: true });
+await supabase.from('ai_artifacts').insert({
+  kind: 'proposal',
+  title: 'AI提案パッケージ',
+  lead_id,
+  customer_id,
+  storage_path: filePath
+});
+```
+
+---
+
+### 5️⃣ 公開閲覧確認
+
+```ts
+const { data } = await supabase
+  .from('ai_artifacts')
+  .select('*')
+  .order('created_at', { ascending: false });
+
+const publicUrl = supabase.storage.from('ai').getPublicUrl(filePath).data.publicUrl;
+```
+
+---
+
+📌 **運用目的**
+
+* AI提案書・見積・メール文面を属人化せず保存
+* 全社員がAI生成結果を即時共有・再利用可能
+* 外部出力はPDF/MD/JSONで統一管理
