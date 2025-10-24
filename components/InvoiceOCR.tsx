@@ -2,8 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { extractInvoiceDetails } from '../services/geminiService';
 import { getInboxItems, addInboxItem, updateInboxItem, deleteInboxItem, uploadFile } from '../services/dataService';
 import { InboxItem, InvoiceData, InboxItemStatus, Toast, ConfirmationDialogProps, EmployeeUser } from '../types';
-// FIX: AlertTriangleをIconsからインポート
-import { Upload, Loader, X, CheckCircle, Save, Trash2, AlertTriangle, RefreshCw } from './Icons';
+import { Upload, Loader, X, CheckCircle, Save, Trash2, AlertTriangle, RefreshCw } from './Icons'; // FIX: AlertTriangleをIconsからインポート
 
 interface InvoiceOCRProps {
     onSaveExpenses: (data: InvoiceData) => void;

@@ -68,7 +68,7 @@ const AuditLogPage: React.FC<AuditLogPageProps> = ({ logs }) => {
                            <pre className="mt-1 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/50 p-2 rounded-md whitespace-pre-wrap font-mono">
                                 <code>
                                     {/* FIX: Add a type check for `log.details` before stringifying to prevent potential runtime errors with non-object types. */}
-                                    {typeof log.details === 'object' ? JSON.stringify(log.details, null, 2) : String(log.details)}
+                                    {typeof log.details === 'object' && log.details !== null ? JSON.stringify(log.details, null, 2) : String(log.details)}
                                 </code>
                            </pre>
                         )}

@@ -298,6 +298,32 @@ export const isSupabaseUnavailableError = (error: any): boolean => {
     return /fetch failed/i.test(message) || /failed to fetch/i.test(message) || /network/i.test(message);
 };
 
+// --- Utility/Helper Functions (moved to top for visibility) ---
+
+export const logUserActivity = async (userId: string, action: string, details?: any): Promise<void> => {
+    const supabase = getSupabase();
+    // Ensure `details` is always an object or null
+    const logDetails = details === undefined ? null : (typeof details === 'object' && details !== null ? details : { value: String(details) });
+
+    const { error } = await supabase.from('user_activity_logs').insert({ user_id: userId, action, details: logDetails });
+    if (error) {
+        console.error('Failed to log user activity:', error);
+    }
+};
+
+export const addApprovalHistory = async (applicationId: string, userId: string, action: ApprovalHistory['action'], comment: string): Promise<void> => {
+    const supabase = getSupabase();
+    const { error } = await supabase.from('approval_history').insert({
+        application_id: applicationId,
+        user_id: userId,
+        action,
+        comment,
+    });
+    if (error) {
+        console.error('Failed to add approval history:', error);
+    }
+};
+
 // --- Data Service Functions ---
 
 export const getJobs = async (): Promise<Job[]> => {
@@ -485,7 +511,7 @@ export const getApplications = async (currentUser: User | null): Promise<Applica
         query = query.or(`applicant_id.eq.${currentUser?.id},approver_id.eq.${currentUser?.id}`);
     }
         
-    const { data, error } = query;
+    const { data, error } = await query; // FIX: Await the query directly
         
     if (error) throw new Error(`Failed to fetch applications: ${error.message}`);
     
@@ -821,6 +847,7 @@ export const updateInvoice = async (id: string, updates: Partial<Invoice>): Prom
     
     const { data, error } = await supabase.from('invoices').update(dbUpdates).eq('id', id).select().single();
     if (error) throw new Error(`Failed to update invoice: ${error.message}`);
+    if (!data) throw new Error(`Invoice with ID ${id} not found after update.`); // FIX: Ensure data is not null before returning
     return data;
 };
 
@@ -859,6 +886,7 @@ export const createInvoiceFromJobs = async (jobIds: string[]): Promise<{ invoice
         subtotal_amount: subtotal, tax_amount: tax, total_amount: total, status: 'issued',
     }).select().single();
     if (invoiceError) throw new Error(`Failed to create invoice record: ${invoiceError.message}`);
+    if (!newInvoice) throw new Error('Failed to create invoice, no data returned.'); // FIX: Ensure newInvoice is not null
 
     const invoiceItems: Omit<InvoiceItem, 'id'>[] = jobsToInvoice.map((job, index) => ({
         invoiceId: newInvoice.id, jobId: job.id, description: `${job.title} (案件番号: ${job.job_number})`,
@@ -881,6 +909,7 @@ export const uploadFile = async (file: File | Blob, bucket: string, fileName: st
     const filePath = `${Date.now()}-${fileToUpload.name}`;
     const { data, error } = await supabase.storage.from(bucket).upload(filePath, fileToUpload);
     if (error) throw new Error(`Failed to upload to ${bucket}: ${error.message}`);
+    if (!data) throw new Error(`File upload to ${bucket} returned no data.`); // FIX: Ensure data is not null
     return { path: data.path };
 };
 
@@ -913,6 +942,7 @@ export const addInboxItem = async (item: Omit<InboxItem, 'id' | 'createdAt' | 'f
         extracted_data: item.extractedData, error_message: item.errorMessage,
     }).select().single();
     if (error) throw new Error(`Failed to add inbox item: ${error.message}`);
+    if (!data) throw new Error('Failed to add inbox item, no data returned.'); // FIX: Ensure data is not null
     return data as InboxItem;
 };
 
@@ -922,6 +952,7 @@ export const updateInboxItem = async (id: string, updates: Partial<InboxItem>): 
         status: updates.status, extracted_data: updates.extractedData,
     }).eq('id', id).select().single();
     if (error) throw new Error(`Failed to update inbox item: ${error.message}`);
+    if (!data) throw new Error(`Inbox item with ID ${id} not found after update.`); // FIX: Ensure data is not null
     
     const url = getPublicUrl(data.file_path, 'inbox');
     return { ...data, fileUrl: url || '', extractedData: data.extracted_data } as InboxItem;
@@ -947,6 +978,7 @@ export const addAIArtifact = async (artifactData: Partial<Omit<AIArtifact, 'id' 
     const supabase = getSupabase();
     const { data, error } = await supabase.from('ai_artifacts').insert(artifactData).select().single();
     if (error) throw new Error(`Failed to add AI artifact: ${error.message}`);
+    if (!data) throw new Error('Failed to add AI artifact, no data returned.'); // FIX: Ensure data is not null
     return dbAIArtifactToAIArtifact(data);
 };
 
@@ -957,6 +989,7 @@ export const updateAIArtifact = async (id: string, updates: Partial<AIArtifact>)
     };
     const { data, error } = await supabase.from('ai_artifacts').update(dbUpdates).eq('id', id).select().single();
     if (error) throw new Error(`Failed to update AI artifact: ${error.message}`);
+    if (!data) throw new Error(`AI artifact with ID ${id} not found after update.`); // FIX: Ensure data is not null
     return dbAIArtifactToAIArtifact(data);
 };
 
@@ -993,6 +1026,7 @@ export const addAnalysisProject = async (projectData: Partial<Omit<AnalysisProje
     const supabase = getSupabase();
     const { data, error } = await supabase.from('analysis_projects').insert(projectData).select().single();
     if (error) throw new Error(`Failed to add analysis project: ${error.message}`);
+    if (!data) throw new Error('Failed to add analysis project, no data returned.'); // FIX: Ensure data is not null
     return data;
 };
 
@@ -1007,6 +1041,7 @@ export const addDocument = async (docData: Partial<Omit<Document, 'id' | 'create
     const supabase = getSupabase();
     const { data, error } = await supabase.from('documents').insert(docData).select().single();
     if (error) throw new Error(`Failed to add document: ${error.message}`);
+    if (!data) throw new Error('Failed to add document, no data returned.'); // FIX: Ensure data is not null
     return data;
 };
 
@@ -1027,6 +1062,7 @@ export const addBankScenario = async (scenarioData: Partial<Omit<BankScenario, '
     const supabase = getSupabase();
     const { data, error } = await supabase.from('bank_scenarios').insert(scenarioData).select().single();
     if (error) throw new Error(`Failed to add bank scenario: ${error.message}`);
+    if (!data) throw new Error('Failed to add bank scenario, no data returned.'); // FIX: Ensure data is not null
     return data;
 };
 
@@ -1041,64 +1077,6 @@ export const addBankSimulation = async (simulationData: Partial<Omit<BankSimulat
     const supabase = getSupabase();
     const { data, error } = await supabase.from('bank_simulations').insert(simulationData).select().single();
     if (error) throw new Error(`Failed to add bank simulation: ${error.message}`);
+    if (!data) throw new Error('Failed to add bank simulation, no data returned.'); // FIX: Ensure data is not null
     return data;
-};
-
-export const logUserActivity = async (userId: string, action: string, details?: any): Promise<void> => {
-    const supabase = getSupabase();
-    // Ensure `details` is always an object or null
-    const logDetails = details === undefined ? null : (typeof details === 'object' && details !== null ? details : { value: String(details) });
-
-    const { error } = await supabase.from('user_activity_logs').insert({ user_id: userId, action, details: logDetails });
-    if (error) {
-        console.error('Failed to log user activity:', error);
-    }
-};
-
-export const getUserActivityLogs = async (userId: string): Promise<UserActivityLog[]> => {
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-        .from('user_activity_logs')
-        .select('*, user:user_id(name)')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(100);
-    if (error) {
-        console.error('Failed to fetch user activity logs:', error);
-        throw error; // Propagate error for UI to handle
-    }
-    return (data || []).map(log => ({
-        ...log,
-        user: log.user || { name: '不明' },
-    }));
-};
-
-export const getApprovalHistory = async (applicationId: string): Promise<ApprovalHistory[]> => {
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-        .from('approval_history')
-        .select('*, user:user_id(name)')
-        .eq('application_id', applicationId)
-        .order('created_at', { ascending: true });
-    if (error) {
-        console.error('Failed to fetch approval history:', error);
-        return [];
-    }
-    return (data || []).map(history => ({
-        ...history,
-        user: history.user || { name: '不明' },
-    }));
-};
-
-export const addApprovalHistory = async (applicationId: string, userId: string, action: ApprovalHistory['action'], comment: string): Promise<void> => {
-    const supabase = getSupabase();
-    const { error } = await supabase.from('approval_history').insert({
-        application_id: applicationId,
-        user_id: userId,
-        action,
-        comment,
-    });
-    if (error) {
-        console.error('Failed to add approval history:', error);
-    }
 };

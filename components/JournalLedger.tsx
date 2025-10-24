@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { JournalEntry, SortConfig, EmployeeUser } from '../types';
-import { PlusCircle, Sparkles, Loader, BookOpen } from '../Icons';
+import { PlusCircle, Sparkles, Loader, BookOpen } from './Icons'; // FIX: Iconsからインポート
 import { suggestJournalEntry } from '../../services/geminiService';
 import EmptyState from '../ui/EmptyState';
 import SortableHeader from '../ui/SortableHeader';
@@ -78,6 +78,7 @@ const JournalLedger: React.FC<JournalLedgerProps> = ({ entries, onAddEntry, isAI
     setIsAiLoading(true);
     setError('');
     try {
+        // FIX: Pass currentUser.id as the second argument
         const suggestion = await suggestJournalEntry(aiPrompt, currentUser.id);
         setNewEntry({
             account: suggestion.account,
@@ -200,4 +201,33 @@ const JournalLedger: React.FC<JournalLedgerProps> = ({ entries, onAddEntry, isAI
                 <SortableHeader sortKey="date" label="日付" sortConfig={sortConfig} requestSort={requestSort} />
                 <SortableHeader sortKey="account" label="勘定科目" sortConfig={sortConfig} requestSort={requestSort} />
                 <SortableHeader sortKey="description" label="摘要" sortConfig={sortConfig} requestSort={requestSort} />
-                <SortableHeader sortKey="debit" label="借方" sortConfig={sortConfig} requestSort={requestSort} className="text
+                <SortableHeader sortKey="debit" label="借方" sortConfig={sortConfig} requestSort={requestSort} className="text-right" />
+                <SortableHeader sortKey="credit" label="貸方" sortConfig={sortConfig} requestSort={requestSort} className="text-right" />
+              </tr>
+            </thead>
+            <tbody>
+              {sortedEntries.map((entry) => (
+                <tr key={entry.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600">
+                  <td className="px-6 py-4 whitespace-nowrap">{new Date(entry.date).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-200">{entry.account}</td>
+                  <td className="px-6 py-4">{entry.description}</td>
+                  <td className="px-6 py-4 text-right">{entry.debit > 0 ? `¥${entry.debit.toLocaleString()}` : '-'}</td>
+                  <td className="px-6 py-4 text-right">{entry.credit > 0 ? `¥${entry.credit.toLocaleString()}` : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState 
+            icon={BookOpen}
+            title="仕訳がありません"
+            message="「仕訳を追加」ボタンから最初の取引を記録してください。"
+            action={{ label: '仕訳を追加', onClick: () => setShowForm(true), icon: PlusCircle }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default React.memo(JournalLedger);

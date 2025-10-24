@@ -25,12 +25,9 @@ const checkOnlineAndAIOff = () => {
     }
 }
 
-async function withRetry<T>(fn: (signal?: AbortSignal) => Promise<T>, retries = 2, delay = 500): Promise<T> {
-    const controller = new AbortController();
-    const signal = controller.signal;
-
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 500): Promise<T> {
     try {
-        return await fn(signal);
+        return await fn();
     } catch (error: any) {
         if (error.name === 'AbortError') {
             throw error; // Propagate AbortError directly
@@ -38,7 +35,6 @@ async function withRetry<T>(fn: (signal?: AbortSignal) => Promise<T>, retries = 
         if (retries > 0) {
             console.warn(`AI API call failed, retrying (${retries} retries left):`, error);
             await new Promise(res => setTimeout(res, delay));
-            controller.abort(); // Abort previous attempt
             return withRetry(fn, retries - 1, delay * 2); // Exponential backoff
         }
         throw error;
@@ -62,7 +58,7 @@ const suggestJobSchema = {
 
 export const getBusinessAnalysisAndSuggestions = async (files: { base64: string; mimeType: string }[], userId: string): Promise<{ analysis: string; suggestions: string[] }> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const parts: any[] = files.map(file => ({
             inlineData: {
                 data: file.base64,
@@ -85,6 +81,7 @@ export const getBusinessAnalysisAndSuggestions = async (files: { base64: string;
         }
         `;
         parts.push({ text: promptText });
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_business_analysis_start', { prompt: promptText, fileCount: files.length });
 
         const response = await ai.models.generateContent({
@@ -94,11 +91,10 @@ export const getBusinessAnalysisAndSuggestions = async (files: { base64: string;
                 responseMimeType: "application/json",
                 thinkingConfig: { thinkingBudget: 32768 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const jsonStr = response.text.trim();
         const result = JSON.parse(jsonStr);
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_business_analysis_finish', { prompt: promptText, response: result });
         return result;
     });
@@ -110,10 +106,10 @@ export const suggestJobParameters = async (
     paperTypes: string[],
     finishingOptions: string[],
     file: { base64: string; mimeType: string; name?: string } | undefined,
-    userId: string,
+    userId: string, // FIX: Added userId parameter
 ): Promise<AISuggestions> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const textPrompt = `以下の依頼内容に基づき、印刷案件のパラメータを提案してください。
 依頼内容: "${prompt}"
 
@@ -137,18 +133,18 @@ export const suggestJobParameters = async (
         }
         parts.push(textPart);
 
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_job_suggestion_start', { prompt, fileName: file?.name });
 
         const response = await ai.models.generateContent({
             model,
             contents: { parts },
             config: { responseMimeType: "application/json", responseSchema: suggestJobSchema },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         const jsonStr = response.text.trim();
         const result = JSON.parse(jsonStr);
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_job_suggestion_finish', { prompt, response: result });
         return result;
     });
@@ -156,7 +152,7 @@ export const suggestJobParameters = async (
 
 export const analyzeCompany = async (customer: Customer, userId: string): Promise<CompanyAnalysis> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下の企業情報に基づいて、詳細な企業分析レポートをJSON形式で作成してください。Web検索も活用し、最新の情報を反映させてください。
 
 企業名: ${customer.customerName}
@@ -176,6 +172,7 @@ JSONのフォーマットは以下のようにしてください:
   }
 }
 `;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_company_analysis_start', { customerId: customer.id, customerName: customer.customerName });
 
         const response = await ai.models.generateContent({
@@ -184,8 +181,6 @@ JSONのフォーマットは以下のようにしてください:
             config: {
                 tools: [{ googleSearch: {} }],
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         
         let jsonStr = response.text.trim();
@@ -200,10 +195,12 @@ JSONのフォーマットは以下のようにしてください:
             const uniqueSources = Array.from(new Map(sources.map(item => [item.uri, item])).values());
             
             const finalResult = { ...result, sources: uniqueSources };
+            // FIX: Pass userId to logUserActivity
             await logUserActivity(userId, 'ai_company_analysis_finish', { customerId: customer.id, response: finalResult });
             return finalResult;
         } catch (e) {
             console.error("Failed to parse JSON from Gemini:", e);
+            // FIX: Pass userId to logUserActivity
             await logUserActivity(userId, 'ai_company_analysis_error', { customerId: customer.id, error: e instanceof Error ? e.message : String(e), rawResponse: jsonStr });
             // Fallback: return the text as part of the analysis.
             return {
@@ -219,8 +216,9 @@ JSONのフォーマットは以下のようにしてください:
 export const investigateLeadCompany = async (companyName: string, userId: string): Promise<CompanyInvestigation> => {
     checkOnlineAndAIOff();
     const modelWithSearch = 'gemini-2.5-flash';
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `企業名「${companyName}」について、その事業内容、最近のニュース、市場での評判を調査し、簡潔にまとめてください。`;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_investigation_start', { companyName });
 
         const response = await ai.models.generateContent({
@@ -229,8 +227,6 @@ export const investigateLeadCompany = async (companyName: string, userId: string
             config: {
                 tools: [{ googleSearch: {} }],
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         const summary = response.text;
@@ -245,6 +241,7 @@ export const investigateLeadCompany = async (companyName: string, userId: string
         const uniqueSources = Array.from(new Map(sources.map(item => [item.uri, item])).values());
         
         const result = { summary, sources: uniqueSources };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_investigation_finish', { companyName, response: result });
         return result;
     });
@@ -252,7 +249,7 @@ export const investigateLeadCompany = async (companyName: string, userId: string
 
 export const enrichCustomerData = async (customerName: string, userId: string): Promise<Partial<Customer>> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `企業名「${customerName}」について、Web検索を用いて以下の情報を調査し、必ずJSON形式で返してください。見つからない情報はnullとしてください。
 - 公式ウェブサイトURL (websiteUrl)
 - 事業内容 (companyContent)
@@ -262,6 +259,7 @@ export const enrichCustomerData = async (customerName: string, userId: string): 
 - 代表電話番号 (phoneNumber)
 - 代表者名 (representative)`;
         
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_customer_enrichment_start', { customerName });
 
         const response = await ai.models.generateContent({
@@ -270,8 +268,6 @@ export const enrichCustomerData = async (customerName: string, userId: string): 
             config: {
                 tools: [{ googleSearch: {} }],
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         
         let jsonStr = response.text.trim();
@@ -287,6 +283,7 @@ export const enrichCustomerData = async (customerName: string, userId: string): 
                 cleanedData[key as keyof Customer] = parsed[key];
             }
         }
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_customer_enrichment_finish', { customerName, response: cleanedData });
         return cleanedData;
     });
@@ -310,21 +307,21 @@ const extractInvoiceSchema = {
 
 export const extractInvoiceDetails = async (imageBase64: string, mimeType: string, userId: string): Promise<InvoiceData> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const imagePart = { inlineData: { data: imageBase64, mimeType } };
         const textPart = { text: "この画像から請求書の詳細情報を抽出してください。" };
         
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_invoice_ocr_start', { mimeType, imageSize: imageBase64.length });
 
         const response = await ai.models.generateContent({
             model,
             contents: { parts: [imagePart, textPart] },
             config: { responseMimeType: "application/json", responseSchema: extractInvoiceSchema },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const jsonStr = response.text.trim();
         const result = JSON.parse(jsonStr);
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_invoice_ocr_finish', { response: result });
         return result;
     });
@@ -343,19 +340,19 @@ const suggestJournalEntrySchema = {
 
 export const suggestJournalEntry = async (prompt: string, userId: string): Promise<AIJournalSuggestion> => {
   checkOnlineAndAIOff();
-  return withRetry(async (signal) => {
+  return withRetry(async () => {
     const fullPrompt = `以下の日常的な取引内容を会計仕訳に変換してください。「${prompt}」`;
+    // FIX: Pass userId to logUserActivity
     await logUserActivity(userId, 'ai_journal_suggestion_start', { prompt: fullPrompt });
 
     const response = await ai.models.generateContent({
       model,
       contents: fullPrompt,
       config: { responseMimeType: "application/json", responseSchema: suggestJournalEntrySchema },
-      // `signal` is not a recognized property in `GenerateContentParameters`.
-      // signal,
     });
     const jsonStr = response.text.trim();
     const result = JSON.parse(jsonStr);
+    // FIX: Pass userId to logUserActivity
     await logUserActivity(userId, 'ai_journal_suggestion_finish', { prompt: fullPrompt, response: result });
     return result;
   });
@@ -363,16 +360,15 @@ export const suggestJournalEntry = async (prompt: string, userId: string): Promi
 
 export const generateSalesEmail = async (customer: Customer, senderName: string, userId: string): Promise<{ subject: string; body: string }> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `顧客名「${customer.customerName}」向けの営業提案メールを作成してください。送信者は「${senderName}」です。`;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_sales_email_start', { customerId: customer.id, customerName: customer.customerName });
 
         const response = await ai.models.generateContent({
             model,
             contents: prompt,
             config: {},
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const text = response.text;
         const subjectMatch = text.match(/件名:\s*(.*)/);
@@ -382,6 +378,7 @@ export const generateSalesEmail = async (customer: Customer, senderName: string,
             subject: subjectMatch ? subjectMatch[1].trim() : 'ご提案の件',
             body: bodyMatch ? bodyMatch[1].trim() : text,
         };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_sales_email_finish', { customerId: customer.id, response: result });
         return result;
     });
@@ -389,20 +386,19 @@ export const generateSalesEmail = async (customer: Customer, senderName: string,
 
 export const generateLeadReplyEmail = async (lead: Lead, senderName: string, userId: string): Promise<{ subject: string; body: string }> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下のリード情報に対して、初回の返信メールを作成してください。
 会社名: ${lead.company}
 担当者名: ${lead.name}様
 問い合わせ内容: ${lead.message || '記載なし'}
 送信者: ${senderName}`;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_reply_email_start', { leadId: lead.id, company: lead.company });
 
         const response = await ai.models.generateContent({
             model,
             contents: prompt,
             config: {},
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const text = response.text;
         const subjectMatch = text.match(/件名:\s*(.*)/);
@@ -412,6 +408,7 @@ export const generateLeadReplyEmail = async (lead: Lead, senderName: string, use
             subject: subjectMatch ? subjectMatch[1].trim() : 'お問い合わせありがとうございます',
             body: bodyMatch ? bodyMatch[1].trim() : text,
         };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_reply_email_finish', { leadId: lead.id, response: result });
         return result;
     });
@@ -419,23 +416,23 @@ export const generateLeadReplyEmail = async (lead: Lead, senderName: string, use
 
 export const analyzeLeadData = async (leads: Lead[], userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下のリードデータ（${leads.length}件）を分析し、営業活動に関する簡潔なインサイトや提案を1つ生成してください。
         特に、有望なリードの傾向や、アプローチすべきセグメントなどを指摘してください。
         
         データサンプル:
         ${JSON.stringify(leads.slice(0, 3).map(l => ({ company: l.company, status: l.status, inquiryType: l.inquiryType, message: l.message })), null, 2)}
         `;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_analysis_start', { leadCount: leads.length });
 
         const response = await ai.models.generateContent({
             model,
             contents: prompt,
             config: {},
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const result = response.text;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_analysis_finish', { response: result });
         return result;
     });
@@ -443,7 +440,7 @@ export const analyzeLeadData = async (leads: Lead[], userId: string): Promise<st
 
 export const getDashboardSuggestion = async (jobs: Job[], userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const recentJobs = jobs.slice(0, 5).map(j => ({
             title: j.title,
             price: j.price,
@@ -457,16 +454,16 @@ export const getDashboardSuggestion = async (jobs: Job[], userId: string): Promi
 データサンプル:
 ${JSON.stringify(recentJobs, null, 2)}
 `;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_dashboard_suggestion_start', { jobCount: jobs.length });
 
         const response = await ai.models.generateContent({
             model,
             contents: prompt,
             config: {},
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const result = response.text;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_dashboard_suggestion_finish', { response: result });
         return result;
     });
@@ -474,20 +471,20 @@ ${JSON.stringify(recentJobs, null, 2)}
 
 export const generateDailyReportSummary = async (customerName: string, activityContent: string, userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下のキーワードを元に、営業日報の活動内容をビジネス文書としてまとめてください。
 訪問先: ${customerName}
 キーワード: ${activityContent}`;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_daily_report_summary_start', { customerName, activityContent });
 
         const response = await ai.models.generateContent({
             model,
             contents: prompt,
             config: {},
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const result = response.text;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_daily_report_summary_finish', { response: result });
         return result;
     });
@@ -495,19 +492,19 @@ export const generateDailyReportSummary = async (customerName: string, activityC
 
 export const generateWeeklyReportSummary = async (keywords: string, userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下のキーワードを元に、週報の報告内容をビジネス文書としてまとめてください。
 キーワード: ${keywords}`;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_weekly_report_summary_start', { keywords });
 
         const response = await ai.models.generateContent({
             model,
             contents: prompt,
             config: {},
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const result = response.text;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_weekly_report_summary_finish', { response: result });
         return result;
     });
@@ -548,20 +545,19 @@ const draftEstimateSchema = {
 
 export const draftEstimate = async (prompt: string, userId: string): Promise<Partial<Estimate>> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const fullPrompt = `あなたは日本の印刷会社で20年以上の経験を持つベテランの見積担当者です。以下の顧客からの要望に基づき、現実的で詳細な見積の下書きをJSON形式で作成してください。原価計算も行い、適切な利益を乗せた単価と金額を設定してください。
 
 【重要】もし顧客の要望が倉庫管理、定期発送、サブスクリプション型のサービスを示唆している場合、必ず「初期費用」と「月額費用」の項目を立てて見積を作成してください。その際の単位は、初期費用なら「式」、月額費用なら「月」としてください。
 
 顧客の要望: "${prompt}"`;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_estimate_draft_start', { prompt: fullPrompt });
 
         const response = await ai.models.generateContent({
             model,
             contents: fullPrompt,
             config: { responseMimeType: "application/json", responseSchema: draftEstimateSchema as any },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const jsonStr = response.text.trim();
         const parsed = JSON.parse(jsonStr);
@@ -569,6 +565,7 @@ export const draftEstimate = async (prompt: string, userId: string): Promise<Par
         if (!parsed.items) {
             parsed.items = [];
         }
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_estimate_draft_finish', { prompt: fullPrompt, response: parsed });
         return parsed;
     });
@@ -579,10 +576,10 @@ export const generateProposalSection = async (
     customer: Customer,
     job: Job | undefined,
     estimate: Estimate | undefined,
-    userId: string,
+    userId: string, // FIX: Added userId parameter
 ): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         let context = `
 顧客情報:
 - 顧客名: ${customer.customerName}
@@ -617,6 +614,7 @@ ${context}
 
 「${sectionTitle}」セクションの下書きを生成してください。
 `;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_proposal_section_start', { customerId: customer.id, sectionTitle, job: job?.id, estimate: estimate?.id });
 
         const response = await ai.models.generateContent({ 
@@ -625,10 +623,9 @@ ${context}
             config: { 
                 tools: [{ googleSearch: {} }],
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const result = response.text;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_proposal_section_finish', { sectionTitle, response: result });
         return result;
     });
@@ -645,22 +642,22 @@ const scoreLeadSchema = {
 
 export const scoreLead = async (lead: Lead, userId: string): Promise<LeadScore> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下のリード情報を分析し、有望度をスコアリングしてください。
 会社名: ${lead.company}
 問い合わせ種別: ${lead.inquiryTypes?.join(', ') || lead.inquiryType}
 メッセージ: ${lead.message}`;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_score_start', { leadId: lead.id });
 
         const response = await ai.models.generateContent({
             model,
             contents: prompt,
             config: { responseMimeType: "application/json", responseSchema: scoreLeadSchema },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const jsonStr = response.text.trim();
         const result = JSON.parse(jsonStr);
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_score_finish', { leadId: lead.id, response: result });
         return result;
     });
@@ -676,7 +673,7 @@ export const startBugReportChat = (): Chat => {
 
 export const processApplicationChat = async (history: { role: 'user' | 'model', content: string }[], appCodes: ApplicationCode[], users: User[], routes: ApprovalRoute[], userId: string): Promise<string> => {
   checkOnlineAndAIOff();
-  return withRetry(async (signal) => {
+  return withRetry(async () => {
       const prompt = `あなたは申請アシスタントです。ユーザーとの会話履歴と以下のマスター情報に基づき、ユーザーの申請を手伝ってください。
 最終的に、ユーザーの申請内容を以下のJSON形式で出力してください。それまでは自然な会話を続けてください。
 { "applicationCodeId": "...", "formData": { ... }, "approvalRouteId": "..." }
@@ -685,16 +682,16 @@ export const processApplicationChat = async (history: { role: 'user' | 'model', 
 申請種別マスター: ${JSON.stringify(appCodes)}
 承認ルートマスター: ${JSON.stringify(routes)}
 `;
+      // FIX: Pass userId to logUserActivity
       await logUserActivity(userId, 'ai_application_chat_start', { chatHistory: history.map(m => m.content), appCodeCount: appCodes.length });
 
       const response = await ai.models.generateContent({
             model,
             contents: prompt,
             config: {},
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
       const result = response.text;
+      // FIX: Pass userId to logUserActivity
       await logUserActivity(userId, 'ai_application_chat_finish', { response: result });
       return result;
   });
@@ -702,19 +699,19 @@ export const processApplicationChat = async (history: { role: 'user' | 'model', 
 
 export const generateClosingSummary = async (type: '月次' | '年次', currentJobs: Job[], prevJobs: Job[], currentJournal: JournalEntry[], prevJournal: JournalEntry[], userId: string): Promise<string> => {
   checkOnlineAndAIOff();
-  return withRetry(async (signal) => {
+  return withRetry(async () => {
     const prompt = `以下のデータに基づき、${type}決算のサマリーを生成してください。前月比や課題、改善提案を含めてください。`;
     // In a real scenario, you'd pass the data, but for brevity we'll just send the prompt.
+    // FIX: Pass userId to logUserActivity
     await logUserActivity(userId, 'ai_closing_summary_start', { type, jobCount: currentJobs.length });
 
     const response = await ai.models.generateContent({
         model,
         contents: prompt,
         config: {},
-        // `signal` is not a recognized property in `GenerateContentParameters`.
-        // signal,
     });
     const result = response.text;
+    // FIX: Pass userId to logUserActivity
     await logUserActivity(userId, 'ai_closing_summary_finish', { response: result });
     return result;
   });
@@ -734,7 +731,7 @@ export const startBusinessConsultantChat = (): Chat => {
 
 export const generateLeadAnalysisAndProposal = async (lead: Lead, userId: string): Promise<{ analysisReport: string; draftProposal: string; }> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下のリード情報とWeb検索の結果を組み合わせて、企業分析レポートと提案書のドラフトを生成し、指定されたJSON形式で出力してください。
 
 リード情報:
@@ -751,6 +748,7 @@ Web検索を活用して、企業の事業内容、最近の動向、および�
   "draftProposal": "分析レポートに基づいた提案書のドラフト。Markdown形式で記述し、「1. 背景と課題」「2. 提案内容」「3. 期待される効果」「4. 概算費用」のセクションを含めてください。「4. 概算費用」: 概算費用を具体的に提示してください。もし書籍の保管や発送代行のような継続的なサービスが含まれる場合、必ず「初期費用」と「月額費用」に分けて、保管料、発送手数料などの具体的な項目と金額を提示してください。"
 }
 `;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_analysis_proposal_start', { leadId: lead.id, company: lead.company });
 
         const response = await ai.models.generateContent({
@@ -760,8 +758,6 @@ Web検索を活用して、企業の事業内容、最近の動向、および�
                 tools: [{ googleSearch: {} }],
                 thinkingConfig: { thinkingBudget: 32768 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         
         let jsonStr = response.text.trim();
@@ -771,11 +767,13 @@ Web検索を活用して、企業の事業内容、最近の動向、および�
 
         try {
             const result = JSON.parse(jsonStr);
+            // FIX: Pass userId to logUserActivity
             await logUserActivity(userId, 'ai_lead_analysis_proposal_finish', { leadId: lead.id, response: result });
             return result;
         } catch (e) {
             console.error("Failed to parse JSON from Gemini for lead analysis:", e);
             console.error("Received text:", jsonStr);
+            // FIX: Pass userId to logUserActivity
             await logUserActivity(userId, 'ai_lead_analysis_proposal_error', { leadId: lead.id, error: e instanceof Error ? e.message : String(e), rawResponse: jsonStr });
             // Fallback: return the text as part of the analysis if JSON parsing fails.
             return {
@@ -788,7 +786,7 @@ Web検索を活用して、企業の事業内容、最近の動向、および�
 
 export const generateMarketResearchReport = async (topic: string, userId: string): Promise<MarketResearchReport> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下のトピックについて、Web検索を活用して詳細な市場調査レポートを、必ず指定されたJSON形式で作成してください。
 
 調査トピック: "${topic}"
@@ -803,6 +801,7 @@ JSONフォーマット:
     "opportunities": ["調査結果から導き出されるビジネスチャンスや機会。箇条書きで複数挙げる。"],
     "threats": ["市場に潜む脅威やリスク。箇条書きで複数挙げる。"]
 }`;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_market_research_start', { topic });
 
         const response = await ai.models.generateContent({
@@ -812,8 +811,6 @@ JSONフォーマット:
                 tools: [{ googleSearch: {} }],
                 thinkingConfig: { thinkingBudget: 32768 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         
         let jsonStr = response.text.trim();
@@ -827,6 +824,7 @@ JSONフォーマット:
         const uniqueSources = Array.from(new Map(sources.map(item => [item.uri, item])).values());
         
         const finalResult = { ...result, sources: uniqueSources };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_market_research_finish', { topic, response: finalResult });
         return finalResult;
     });
@@ -834,7 +832,7 @@ JSONフォーマット:
 
 export const generateCustomProposalContent = async (lead: Lead, userId: string): Promise<CustomProposalContent> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `あなたは「文唱堂印刷株式会社」の優秀なセールスコンサルタントです。以下のリード情報を基に、Webリサーチを徹底的に行い、その企業のためだけの本格的な提案資料のコンテンツを、必ず指定されたJSON形式で生成してください。
 
 ## リード情報
@@ -853,6 +851,7 @@ export const generateCustomProposalContent = async (lead: Lead, userId: string):
     "proposal": "上記の課題を解決するための、自社（文唱堂印刷）の具体的なサービス提案。提供する価値やメリットを明確にする。",
     "conclusion": "提案の締めくくりと、次のアクションを促す力強い結びの言葉。"
 }`;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_custom_proposal_content_start', { leadId: lead.id, company: lead.company });
 
         const response = await ai.models.generateContent({
@@ -862,8 +861,6 @@ export const generateCustomProposalContent = async (lead: Lead, userId: string):
                 tools: [{ googleSearch: {} }],
                 thinkingConfig: { thinkingBudget: 32768 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         let jsonStr = response.text.trim();
@@ -872,11 +869,13 @@ export const generateCustomProposalContent = async (lead: Lead, userId: string):
         }
         try {
             const result = JSON.parse(jsonStr);
+            // FIX: Pass userId to logUserActivity
             await logUserActivity(userId, 'ai_custom_proposal_content_finish', { leadId: lead.id, response: result });
             return result;
         } catch (e) {
             console.error("Failed to parse JSON from Gemini for custom proposal:", e);
             console.error("Received text:", jsonStr);
+            // FIX: Pass userId to logUserActivity
             await logUserActivity(userId, 'ai_custom_proposal_content_error', { leadId: lead.id, error: e instanceof Error ? e.message : String(e), rawResponse: jsonStr });
             throw new Error("AIからの提案書コンテンツの生成に失敗しました。");
         }
@@ -885,7 +884,7 @@ export const generateCustomProposalContent = async (lead: Lead, userId: string):
 
 export const createLeadProposalPackage = async (lead: Lead, userId: string): Promise<LeadProposalPackage> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `あなたは「文唱堂印刷株式会社」の非常に優秀なセールスコンサルタントです。以下のリード情報を分析し、次のタスクを実行してください。
 
 ## リード情報
@@ -926,6 +925,7 @@ export const createLeadProposalPackage = async (lead: Lead, userId: string): Pro
     ]
 }
 `;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_lead_proposal_package_start', { leadId: lead.id, company: lead.company });
 
         const response = await ai.models.generateContent({
@@ -935,8 +935,6 @@ export const createLeadProposalPackage = async (lead: Lead, userId: string): Pro
                 tools: [{ googleSearch: {} }],
                 thinkingConfig: { thinkingBudget: 32768 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         let jsonStr = response.text.trim();
@@ -945,11 +943,13 @@ export const createLeadProposalPackage = async (lead: Lead, userId: string): Pro
         }
         try {
             const result = JSON.parse(jsonStr);
+            // FIX: Pass userId to logUserActivity
             await logUserActivity(userId, 'ai_lead_proposal_package_finish', { leadId: lead.id, response: result });
             return result;
         } catch (e) {
             console.error("Failed to parse JSON from Gemini for lead proposal package:", e);
             console.error("Received text:", jsonStr);
+            // FIX: Pass userId to logUserActivity
             await logUserActivity(userId, 'ai_lead_proposal_package_error', { leadId: lead.id, error: e instanceof Error ? e.message : String(e), rawResponse: jsonStr });
             throw new Error("AIからの提案パッケージの生成に失敗しました。");
         }
@@ -958,16 +958,16 @@ export const createLeadProposalPackage = async (lead: Lead, userId: string): Pro
 
 export const getChatbotResponse = async (userMessage: string, userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_chatbot_request', { message: userMessage });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: userMessage,
             config: {},
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const result = response.text;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_chatbot_response', { response: result });
         return result;
     });
@@ -975,7 +975,7 @@ export const getChatbotResponse = async (userMessage: string, userId: string): P
 
 export const processUnstructuredData = async (text: string, userName: string, file: { base64: string; mimeType: string } | undefined, userId: string): Promise<GenerateContentResponse> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const parts = [];
         if (file) {
             parts.push({ inlineData: { data: file.base64, mimeType: file.mimeType } });
@@ -991,6 +991,7 @@ export const processUnstructuredData = async (text: string, userName: string, fi
 これらの関数以外は使用しないでください。
 `});
         
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_data_entry_start', { text, fileName: file?.base64 ? 'file_attached' : undefined });
 
         const response = await ai.models.generateContent({
@@ -1005,9 +1006,8 @@ export const processUnstructuredData = async (text: string, userName: string, fi
                     ],
                 }],
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_data_entry_finish', { response: response.text, functionCalls: response.functionCalls });
         return response;
     });
@@ -1015,9 +1015,10 @@ export const processUnstructuredData = async (text: string, userName: string, fi
 
 export const analyzeImage = async (base64: string, mimeType: string, prompt: string, userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const imagePart = { inlineData: { data: base64, mimeType } };
         const textPart = { text: prompt };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_image_analysis_start', { prompt, mimeType, imageSize: base64.length });
 
         const response = await ai.models.generateContent({
@@ -1026,10 +1027,9 @@ export const analyzeImage = async (base64: string, mimeType: string, prompt: str
             config: {
                 thinkingConfig: { thinkingBudget: 100 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const result = response.text;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_image_analysis_finish', { prompt, response: result });
         return result;
     });
@@ -1037,9 +1037,10 @@ export const analyzeImage = async (base64: string, mimeType: string, prompt: str
 
 export const editImageWithText = async (base64: string, mimeType: string, prompt: string, userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const imagePart = { inlineData: { data: base64, mimeType } };
         const textPart = { text: prompt };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_image_edit_start', { prompt, mimeType, imageSize: base64.length });
 
         const response = await ai.models.generateContent({
@@ -1048,14 +1049,13 @@ export const editImageWithText = async (base64: string, mimeType: string, prompt
             config: {
                 responseModalities: [Modality.IMAGE],
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         const resultBase64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
         if (!resultBase64) {
             throw new Error('AIが画像を生成できませんでした。');
         }
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_image_edit_finish', { prompt, imageSize: resultBase64.length });
         return resultBase64;
     });
@@ -1063,7 +1063,8 @@ export const editImageWithText = async (base64: string, mimeType: string, prompt
 
 export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4', userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_image_generation_start', { prompt, aspectRatio });
 
         const response = await ai.models.generateImages({
@@ -1074,14 +1075,13 @@ export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' 
                 outputMimeType: 'image/jpeg',
                 aspectRatio: aspectRatio,
             },
-            // `signal` is not a recognized property in `GenerateImagesParameters`.
-            // signal,
         });
 
         const resultBase64 = response.generatedImages[0].image.imageBytes;
         if (!resultBase64) {
             throw new Error('AIが画像を生成できませんでした。');
         }
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_image_generation_finish', { prompt, imageSize: resultBase64.length });
         return resultBase64;
     });
@@ -1089,7 +1089,8 @@ export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' 
 
 export const generateSpeech = async (text: string, userId: string): Promise<{ audioBlob: Blob, artifactData: Partial<Omit<AIArtifact, 'id' | 'createdAt' | 'updatedAt'>> }> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_tts_start', { text });
 
         const response = await ai.models.generateContent({
@@ -1101,8 +1102,6 @@ export const generateSpeech = async (text: string, userId: string): Promise<{ au
                     voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
                 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
@@ -1118,6 +1117,7 @@ export const generateSpeech = async (text: string, userId: string): Promise<{ au
             body_md: text,
             created_by: userId,
         };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_tts_finish', { text, audioSize: base64Audio.length });
         return { audioBlob, artifactData };
     });
@@ -1125,7 +1125,7 @@ export const generateSpeech = async (text: string, userId: string): Promise<{ au
 
 export const transcribeAudio = async (audioBlob: Blob, userId: string): Promise<{ text: string, artifactData: Partial<Omit<AIArtifact, 'id' | 'createdAt' | 'updatedAt'>> }> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const audioBase64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
@@ -1133,6 +1133,7 @@ export const transcribeAudio = async (audioBlob: Blob, userId: string): Promise<
             reader.readAsDataURL(audioBlob);
         });
 
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_audio_transcription_start', { audioSize: audioBlob.size, mimeType: audioBlob.type });
 
         const response = await ai.models.generateContent({
@@ -1146,8 +1147,6 @@ export const transcribeAudio = async (audioBlob: Blob, userId: string): Promise<
             config: {
                 thinkingConfig: { thinkingBudget: 100 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         const text = response.text;
@@ -1161,6 +1160,7 @@ export const transcribeAudio = async (audioBlob: Blob, userId: string): Promise<
             body_md: text,
             created_by: userId,
         };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_audio_transcription_finish', { transcriptionText: text.substring(0, 100) });
         return { text, artifactData };
     });
@@ -1168,7 +1168,7 @@ export const transcribeAudio = async (audioBlob: Blob, userId: string): Promise<
 
 export const analyzeVideo = async (videoFile: File, prompt: string, userId: string): Promise<{ text: string, artifactData: Partial<Omit<AIArtifact, 'id' | 'createdAt' | 'updatedAt'>> }> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const videoBase64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
@@ -1176,6 +1176,7 @@ export const analyzeVideo = async (videoFile: File, prompt: string, userId: stri
             reader.readAsDataURL(videoFile);
         });
 
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_video_analysis_start', { prompt, videoSize: videoFile.size, mimeType: videoFile.type });
 
         const response = await ai.models.generateContent({
@@ -1189,8 +1190,6 @@ export const analyzeVideo = async (videoFile: File, prompt: string, userId: stri
             config: {
                 thinkingConfig: { thinkingBudget: 100 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         const text = response.text;
@@ -1204,6 +1203,7 @@ export const analyzeVideo = async (videoFile: File, prompt: string, userId: stri
             body_md: text,
             created_by: userId,
         };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_video_analysis_finish', { analysisResult: text.substring(0, 100) });
         return { text, artifactData };
     });
@@ -1211,7 +1211,8 @@ export const analyzeVideo = async (videoFile: File, prompt: string, userId: stri
 
 export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16', setLoadingMessage: (message: string) => void, userId: string): Promise<{ videoUrl: string, artifactData: Partial<Omit<AIArtifact, 'id' | 'createdAt' | 'updatedAt'>> }> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_video_generation_start', { prompt, aspectRatio });
         setLoadingMessage('動画生成リクエストを送信中...');
 
@@ -1223,7 +1224,6 @@ export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'
                 resolution: '720p',
                 aspectRatio: aspectRatio
             },
-            signal,
         });
 
         setLoadingMessage('動画生成中... (数分かかります)');
@@ -1231,7 +1231,6 @@ export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'
             await new Promise(resolve => setTimeout(resolve, 10000));
             operation = await ai.operations.getVideosOperation({ operation: operation });
             setLoadingMessage(`動画生成中... (進捗: ${operation.metadata?.state || 'Unknown'})`);
-            if (signal?.aborted) throw new Error('AbortError');
         }
 
         const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
@@ -1240,7 +1239,7 @@ export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'
         }
 
         // Fetch the video blob using the download link and the API key
-        const response = await fetch(`${downloadLink}&key=${API_KEY}`, { signal });
+        const response = await fetch(`${downloadLink}&key=${API_KEY}`);
         if (!response.ok) {
             throw new Error(`Failed to fetch video: ${response.statusText}`);
         }
@@ -1254,6 +1253,7 @@ export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'
             body_md: prompt,
             created_by: userId,
         };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_video_generation_finish', { prompt, videoUrl });
         return { videoUrl, artifactData };
     });
@@ -1261,7 +1261,7 @@ export const generateVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'
 
 export const transcribeVideoWithTimestamps = async (videoFile: File, prompt: string, userId: string): Promise<Partial<Omit<AIArtifact, 'id' | 'createdAt' | 'updatedAt'>>> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const videoBase64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
@@ -1269,6 +1269,7 @@ export const transcribeVideoWithTimestamps = async (videoFile: File, prompt: str
             reader.readAsDataURL(videoFile);
         });
 
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_video_transcription_start', { prompt, videoSize: videoFile.size, mimeType: videoFile.type });
 
         const response = await ai.models.generateContent({
@@ -1282,8 +1283,6 @@ export const transcribeVideoWithTimestamps = async (videoFile: File, prompt: str
             config: {
                 thinkingConfig: { thinkingBudget: 100 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         const text = response.text;
@@ -1297,6 +1296,7 @@ export const transcribeVideoWithTimestamps = async (videoFile: File, prompt: str
             body_md: text,
             created_by: userId,
         };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_video_transcription_finish', { transcriptionText: text.substring(0, 100) });
         return artifactData;
     });
@@ -1304,7 +1304,7 @@ export const transcribeVideoWithTimestamps = async (videoFile: File, prompt: str
 
 export const generateManuscript = async (characterCount: number, referenceText: string, referenceFile: { base64: string; mimeType: string } | null, specFile: { base64: string; mimeType: string } | null, userId: string): Promise<Partial<Omit<AIArtifact, 'id' | 'createdAt' | 'updatedAt'>>> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const parts = [];
         let promptText = `以下の指示と参照情報に基づいて、約${characterCount}文字の原稿を作成してください。`;
 
@@ -1321,6 +1321,7 @@ export const generateManuscript = async (characterCount: number, referenceText: 
         }
         parts.push({ text: promptText });
 
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_copywriting_start', { characterCount, hasRefText: !!referenceText, hasRefFile: !!referenceFile, hasSpecFile: !!specFile });
 
         const response = await ai.models.generateContent({
@@ -1330,8 +1331,6 @@ export const generateManuscript = async (characterCount: number, referenceText: 
                 maxOutputTokens: Math.round(characterCount * 2), // Approximate token count
                 thinkingConfig: { thinkingBudget: Math.max(100, Math.round(characterCount / 5)) },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
 
         const text = response.text;
@@ -1345,6 +1344,7 @@ export const generateManuscript = async (characterCount: number, referenceText: 
             body_md: text,
             created_by: userId,
         };
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_copywriting_finish', { generatedLength: text.length });
         return artifactData;
     });
@@ -1352,7 +1352,8 @@ export const generateManuscript = async (characterCount: number, referenceText: 
 
 export const analyzeDocumentContent = async (prompt: string, userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_document_analysis_start', { prompt });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-pro',
@@ -1360,10 +1361,9 @@ export const analyzeDocumentContent = async (prompt: string, userId: string): Pr
             config: {
                 thinkingConfig: { thinkingBudget: 100 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const result = response.text;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_document_analysis_finish', { result: result.substring(0, 100) });
         return result;
     });
@@ -1371,12 +1371,13 @@ export const analyzeDocumentContent = async (prompt: string, userId: string): Pr
 
 export const runBankSimulation = async (documents: Document[], scenario: BankScenario, userId: string): Promise<{ analysis_summary: string, simulation_result: any, source_artifacts: { file_id: string; file_name: string }[] }> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下の資料とシナリオに基づいて、銀行融資シミュレーションを実行し、その分析サマリーと結果をJSON形式で提供してください。
 資料: ${JSON.stringify(documents.map(d => ({ name: d.file_name, extracted_text: d.extracted_text })))}
-シナリオ: ${JSON.stringify(scenario)}
+シナario: ${JSON.stringify(scenario)}
 JSONフォーマット: { "analysis_summary": "概要", "simulation_result": { ... }, "source_artifacts": [ { "file_id": "doc-id", "file_name": "name" } ] }
 `;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_bank_simulation_start', { scenarioId: scenario.id, docCount: documents.length });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-pro',
@@ -1385,14 +1386,13 @@ JSONフォーマット: { "analysis_summary": "概要", "simulation_result": { .
                 responseMimeType: "application/json",
                 thinkingConfig: { thinkingBudget: 32768 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         let jsonStr = response.text.trim();
         if (jsonStr.startsWith('```json')) {
             jsonStr = jsonStr.substring(7, jsonStr.length - 3).trim();
         }
         const result = JSON.parse(jsonStr);
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_bank_simulation_finish', { scenarioId: scenario.id, result: result.analysis_summary });
         return result;
     });
@@ -1400,7 +1400,7 @@ JSONフォーマット: { "analysis_summary": "概要", "simulation_result": { .
 
 export const generateBankLoanProposalText = async (documentSummary: string, scenarioName: string, simulationResult: string, userId: string): Promise<string> => {
     checkOnlineAndAIOff();
-    return withRetry(async (signal) => {
+    return withRetry(async () => {
         const prompt = `以下の情報に基づいて、銀行への融資提案書（事業計画書）の本文を作成してください。
 
 資料の要約: ${documentSummary}
@@ -1409,6 +1409,7 @@ export const generateBankLoanProposalText = async (documentSummary: string, scen
 
 プロフェッショナルで、銀行が関心を持つポイント（返済能力、成長戦略など）を強調し、具体的かつ説得力のある内容にしてください。
 `;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_bank_proposal_text_start', { scenarioName, simulationResult: simulationResult.substring(0, 100) });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-pro',
@@ -1416,10 +1417,9 @@ export const generateBankLoanProposalText = async (documentSummary: string, scen
             config: {
                 thinkingConfig: { thinkingBudget: 32768 },
             },
-            // `signal` is not a recognized property in `GenerateContentParameters`.
-            // signal,
         });
         const result = response.text;
+        // FIX: Pass userId to logUserActivity
         await logUserActivity(userId, 'ai_bank_proposal_text_finish', { result: result.substring(0, 100) });
         return result;
     });
