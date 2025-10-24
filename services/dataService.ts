@@ -35,13 +35,39 @@ import {
     Title,
     AIArtifact,
     EstimateItem,
-    AnalysisProject,
-    Document,
-    BankScenario,
-    BankSimulation,
-    UserActivityLog,
-    ApprovalHistory,
+    AnalysisProject, // FIX: Import missing AnalysisProject
+    Document, // FIX: Import missing Document
+    BankScenario, // FIX: Import missing BankScenario
+    BankSimulation, // FIX: Import missing BankSimulation
+    UserActivityLog, // FIX: Import missing UserActivityLog
+    ApprovalHistory, // FIX: Import missing ApprovalHistory
 } from '../types';
+
+// --- Utility/Helper Functions (moved to top for visibility) ---
+
+export const logUserActivity = async (userId: string, action: string, details?: any): Promise<void> => {
+    const supabase = getSupabase();
+    // Ensure `details` is always an object or null
+    const logDetails = details === undefined ? null : (typeof details === 'object' && details !== null ? details : { value: String(details) });
+
+    const { error } = await supabase.from('user_activity_logs').insert({ user_id: userId, action, details: logDetails });
+    if (error) {
+        console.error('Failed to log user activity:', error);
+    }
+};
+
+export const addApprovalHistory = async (applicationId: string, userId: string, action: ApprovalHistory['action'], comment: string): Promise<void> => {
+    const supabase = getSupabase();
+    const { error } = await supabase.from('approval_history').insert({
+        application_id: applicationId,
+        user_id: userId,
+        action,
+        comment,
+    });
+    if (error) {
+        console.error('Failed to add approval history:', error);
+    }
+};
 
 // Mappers from snake_case (DB) to camelCase (JS)
 const dbJobToJob = (dbJob: any): Job => ({
@@ -64,7 +90,7 @@ const dbJobToJob = (dbJob: any): Job => ({
     readyToInvoice: dbJob.ready_to_invoice,
     invoiceId: dbJob.invoice_id,
     manufacturingStatus: dbJob.manufacturing_status,
-    aiAnalysisReport: dbJob.ai_analysis_report,
+    aiAnalysisReport: dbJob.ai_analysis_report, // FIX: Add aiAnalysisReport mapping
 });
 
 const jobToDbJob = (job: Partial<Job>): any => ({
@@ -85,7 +111,7 @@ const jobToDbJob = (job: Partial<Job>): any => ({
     ready_to_invoice: job.readyToInvoice,
     invoice_id: job.invoiceId,
     manufacturing_status: job.manufacturingStatus,
-    ai_analysis_report: job.aiAnalysisReport,
+    ai_analysis_report: job.aiAnalysisReport, // FIX: Add aiAnalysisReport mapping
 });
 
 const dbCustomerToCustomer = (dbCustomer: any): Customer => ({
@@ -183,7 +209,7 @@ const dbLeadToLead = (dbLead: any): Lead => ({
     score: dbLead.score,
     aiAnalysisReport: dbLead.ai_analysis_report,
     aiDraftProposal: dbLead.ai_draft_proposal,
-    aiInvestigation: dbLead.ai_investigation,
+    aiInvestigation: dbLead.ai_investigation, // FIX: Add aiInvestigation mapping
 });
 
 const leadToDbLead = (lead: Partial<Lead>): any => {
@@ -235,17 +261,17 @@ const dbApprovalRouteToApprovalRoute = (d: any): ApprovalRoute => ({
 
 const dbAIArtifactToAIArtifact = (dbArtifact: any): AIArtifact => ({
   id: dbArtifact.id,
-  project_id: dbArtifact.project_id,
+  project_id: dbArtifact.project_id, // FIX: Add project_id
   kind: dbArtifact.kind,
   title: dbArtifact.title,
   lead_id: dbArtifact.lead_id,
   customer_id: dbArtifact.customer_id,
   body_md: dbArtifact.body_md,
-  content_json: dbArtifact.content_json,
+  content_json: dbArtifact.content_json, // FIX: Add content_json
   storage_path: dbArtifact.storage_path,
   status: dbArtifact.status,
   created_by: dbArtifact.created_by,
-  created_by_user: dbArtifact.created_by_user,
+  created_by_user: dbArtifact.created_by_user, // FIX: Include created_by_user
   createdAt: dbArtifact.created_at,
   updatedAt: dbArtifact.updated_at,
 });
@@ -296,32 +322,6 @@ export const isSupabaseUnavailableError = (error: any): boolean => {
     const message = typeof error === 'string' ? error : error.message || error.details || error.error_description;
     if (!message) return false;
     return /fetch failed/i.test(message) || /failed to fetch/i.test(message) || /network/i.test(message);
-};
-
-// --- Utility/Helper Functions (moved to top for visibility) ---
-
-export const logUserActivity = async (userId: string, action: string, details?: any): Promise<void> => {
-    const supabase = getSupabase();
-    // Ensure `details` is always an object or null
-    const logDetails = details === undefined ? null : (typeof details === 'object' && details !== null ? details : { value: String(details) });
-
-    const { error } = await supabase.from('user_activity_logs').insert({ user_id: userId, action, details: logDetails });
-    if (error) {
-        console.error('Failed to log user activity:', error);
-    }
-};
-
-export const addApprovalHistory = async (applicationId: string, userId: string, action: ApprovalHistory['action'], comment: string): Promise<void> => {
-    const supabase = getSupabase();
-    const { error } = await supabase.from('approval_history').insert({
-        application_id: applicationId,
-        user_id: userId,
-        action,
-        comment,
-    });
-    if (error) {
-        console.error('Failed to add approval history:', error);
-    }
 };
 
 // --- Data Service Functions ---
@@ -1079,4 +1079,18 @@ export const addBankSimulation = async (simulationData: Partial<Omit<BankSimulat
     if (error) throw new Error(`Failed to add bank simulation: ${error.message}`);
     if (!data) throw new Error('Failed to add bank simulation, no data returned.'); // FIX: Ensure data is not null
     return data;
+};
+
+export const getUserActivityLogs = async (userId: string): Promise<UserActivityLog[]> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('user_activity_logs').select('*, user:user_id(name)').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch user activity logs: ${error.message}`);
+    return (data || []).map(d => ({
+        id: d.id,
+        user_id: d.user_id,
+        action: d.action,
+        details: d.details,
+        created_at: d.created_at,
+        user: d.user || { name: '不明' }
+    }));
 };

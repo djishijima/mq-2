@@ -34,6 +34,9 @@ import {
   Document,
   BankScenario,
   BankSimulation,
+  AllocationDivision, // Added missing property
+  Title, // Added missing property
+  AIArtifact, // Added missing property
 } from '../types';
 
 export interface DemoDataState {
@@ -62,7 +65,7 @@ export interface DemoDataState {
   bankScenarios: BankScenario[];
   bankSimulations: BankSimulation[];
   allocationDivisions: AllocationDivision[]; // Added missing property
-  titles: any[]; // Added missing property
+  titles: Title[]; // Added missing property
   aiArtifacts: AIArtifact[]; // Added missing property
 }
 
@@ -858,7 +861,7 @@ export const createDemoDataState = (): DemoDataState => {
     { id: 'alloc-002', name: '営業部経費', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
   ];
 
-  const titles: any[] = [
+  const titles: Title[] = [
     { id: 'title-001', name: '代表取締役', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
     { id: 'title-002', name: '部長', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
   ];
@@ -890,32 +893,32 @@ export const createDemoDataState = (): DemoDataState => {
   ];
 
   return {
-    jobs,
-    customers,
-    journalEntries,
-    accountItems,
-    leads,
-    approvalRoutes,
-    purchaseOrders,
-    inventoryItems,
-    employees,
-    employeeUsers,
-    bugReports,
-    estimates,
-    applications,
-    applicationCodes,
-    invoices,
-    inboxItems,
-    departments,
-    paymentRecipients,
-    userActivityLogs,
-    approvalHistory,
-    analysisProjects,
-    documents,
-    bankScenarios,
-    bankSimulations,
-    allocationDivisions,
-    titles,
-    aiArtifacts,
+    jobs: clone(jobs),
+    customers: clone(customers),
+    journalEntries: clone (journalEntries),
+    accountItems: clone (accountItems),
+    leads: clone(leads),
+    approvalRoutes: clone (approvalRoutes),
+    purchaseOrders: clone (purchaseOrders),
+    inventoryItems: clone(inventoryItems),
+    employees: clone(employees),
+    employeeUsers: clone (employeeUsers),
+    bugReports: clone(bugReports),
+    estimates: clone(estimates),
+    applications: clone(applications),
+    applicationCodes: clone (applicationCodes),
+    invoices: clone(invoices),
+    inboxItems: clone(inboxItems),
+    departments: clone(departments),
+    paymentRecipients: clone(paymentRecipients),
+    userActivityLogs: clone (userActivityLogs),
+    approvalHistory: clone (approvalHistory),
+    analysisProjects: clone (analysisProjects),
+    documents: clone(documents),
+    bankScenarios: clone(bankScenarios),
+    bankSimulations: clone(bankSimulations),
+    allocationDivisions: clone(allocationDivisions),
+    titles: clone(titles),
+    aiArtifacts: clone(aiArtifacts),
   };
 };

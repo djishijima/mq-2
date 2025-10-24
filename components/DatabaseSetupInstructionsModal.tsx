@@ -97,7 +97,7 @@ SELECT
     e.department,
     e.title,
     u.email, -- auth.users から email を取得
-    COALESCE(pu.role, 'user') AS role, -- public.users テーブルからロールを取得
+    COALESCE(pu.role, 'user') AS role, -- public.users からロールを取得
     e.created_at
 FROM
     public.employees e
@@ -207,7 +207,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
     info_history TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     post_no TEXT,
-    address_2 TEXT,
+    address2 TEXT,
     fax TEXT,
     closing_day TEXT,
     monthly_plan TEXT,
@@ -228,9 +228,9 @@ CREATE TABLE IF NOT EXISTS public.customers (
     branch_name TEXT,
     account_no TEXT,
     sales_user_code TEXT,
-    startDate DATE,
-    endDate DATE,
-    drawingDate DATE,
+    start_date DATE,
+    end_date DATE,
+    drawing_date DATE,
     sales_goal TEXT,
     info_sales_ideas TEXT,
     customer_contact_info TEXT,
@@ -304,8 +304,8 @@ CREATE TABLE IF NOT EXISTS public.ai_artifacts (
   storage_path text, -- 添付ファイルパス (PDFなど)
   status text DEFAULT 'ready' NOT NULL, -- 'ready', 'archived'
   created_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+  created_at timestamptz DEFAULT now() NOT NULL,
+  updated_at timestamptz DEFAULT now() NOT NULL
 );
 
 -- estimates テーブル (不具合修正)
@@ -318,8 +318,8 @@ CREATE TABLE IF NOT EXISTS public.estimates (
   status text DEFAULT 'draft',
   body_md text,
   created_by uuid,
-  created_at timestamptz DEFAULT NOW(),
-  updated_at timestamptz DEFAULT NOW()
+  created_at timestamptz DEFAULT now() NOT NULL,
+  updated_at timestamptz DEFAULT now() NOT NULL
 );
 
 -- 2. カラム補完とトリガー設定
@@ -335,7 +335,7 @@ ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
 -- 共通のupdated_at更新関数
 CREATE OR REPLACE FUNCTION public.touch_updated_at()
 RETURNS trigger AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ LANGUAGE plpgsql;
 
 -- 'applications' テーブルのトリガー
 DROP TRIGGER IF EXISTS on_applications_update ON public.applications;
@@ -446,7 +446,7 @@ DROP POLICY IF EXISTS estimates_all_auth ON public.estimates;
 
 -- 権限付与
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT SELECT ON public.v_departments TO anon, authenticated;
+GRANT SELECT ON public.v_employees_active TO anon, authenticated; -- Modified to use v_employees_active
 
 -- 参照用テーブルにSELECT権限を付与
 CREATE POLICY "Allow authenticated read access" ON public.forms FOR SELECT TO authenticated USING (true);
@@ -506,3 +506,52 @@ CREATE POLICY receipts_auth_all ON storage.objects FOR ALL TO authenticated USIN
 NOTIFY pgrst, 'reload schema';
 
 COMMIT;
+`;
+
+
+const DatabaseSetupInstructionsModal: React.FC<Props> = ({ onRetry }) => {
+    return (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/70 p-4">
+            <div className="relative max-w-4xl w-full rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-700 px-6 py-5 flex-shrink-0">
+                    <BookOpen className="h-6 w-6 text-blue-600" />
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">データベース セットアップスクリプト</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">以下のSQLをSupabaseのSQL Editorに貼り付けて実行してください。</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onRetry}
+                        className="ml-auto rounded-full p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        aria-label="閉じる"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+                <div className="px-6 py-6 overflow-y-auto">
+                    <pre className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words font-mono">
+                        <code>{sqlScript}</code>
+                    </pre>
+                </div>
+                <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex-shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => { navigator.clipboard.writeText(sqlScript); alert('SQLスクリプトをクリップボードにコピーしました。'); }}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-slate-700"
+                    >
+                        スクリプトをコピー
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onRetry}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
+                    >
+                        実行したので再読み込み
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default DatabaseSetupInstructionsModal;

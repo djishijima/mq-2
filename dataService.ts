@@ -35,13 +35,42 @@ import {
     Title,
     AIArtifact,
     EstimateItem,
-    AnalysisProject, // FIX: Import missing AnalysisProject
-    Document, // FIX: Import missing Document
-    BankScenario, // FIX: Import missing BankScenario
-    BankSimulation, // FIX: Import missing BankSimulation
-    UserActivityLog, // FIX: Import missing UserActivityLog
-    ApprovalHistory, // FIX: Import missing ApprovalHistory
+    AnalysisProject,
+    Document,
+    BankScenario,
+    BankSimulation,
+    UserActivityLog,
+    ApprovalHistory,
 } from '../types';
+
+// --- Utility/Helper Functions (moved to top for visibility) ---
+
+// FIX: Moved logUserActivity to the top
+export const logUserActivity = async (userId: string, action: string, details?: any): Promise<void> => {
+    const supabase = getSupabase();
+    // Ensure `details` is always an object or null
+    const logDetails = details === undefined ? null : (typeof details === 'object' && details !== null ? details : { value: String(details) });
+
+    const { error } = await supabase.from('user_activity_logs').insert({ user_id: userId, action, details: logDetails });
+    if (error) {
+        console.error('Failed to log user activity:', error);
+    }
+};
+
+// FIX: Moved addApprovalHistory to the top
+export const addApprovalHistory = async (applicationId: string, userId: string, action: ApprovalHistory['action'], comment: string): Promise<void> => {
+    const supabase = getSupabase();
+    const { error } = await supabase.from('approval_history').insert({
+        application_id: applicationId,
+        user_id: userId,
+        action,
+        comment,
+    });
+    if (error) {
+        console.error('Failed to add approval history:', error);
+    }
+};
+
 
 // Mappers from snake_case (DB) to camelCase (JS)
 const dbJobToJob = (dbJob: any): Job => ({
@@ -821,6 +850,7 @@ export const updateInvoice = async (id: string, updates: Partial<Invoice>): Prom
     
     const { data, error } = await supabase.from('invoices').update(dbUpdates).eq('id', id).select().single();
     if (error) throw new Error(`Failed to update invoice: ${error.message}`);
+    if (!data) throw new Error(`Invoice with ID ${id} not found after update.`); // FIX: Ensure data is not null before returning
     return data;
 };
 
@@ -844,4 +874,226 @@ export const getInvoices = async (): Promise<Invoice[]> => {
 
 export const createInvoiceFromJobs = async (jobIds: string[]): Promise<{ invoiceNo: string }> => {
     const supabase = getSupabase();
-    const { data: jobsToInvoice, error: jobsError } = await supabase.
+    const { data: jobsToInvoice, error: jobsError } = await supabase.from('jobs').select('*').in('id', jobIds);
+    if (jobsError) throw new Error(`Failed to fetch jobs for invoicing: ${jobsError.message}`);
+    if (!jobsToInvoice || jobsToInvoice.length === 0) throw new Error("No jobs found for invoicing.");
+
+    const customerName = jobsToInvoice[0].client_name;
+    const subtotal = jobsToInvoice.reduce((sum, job) => sum + job.price, 0);
+    const tax = subtotal * 0.1;
+    const total = subtotal + tax;
+    const invoiceNo = `INV-${Date.now()}`;
+
+    const { data: newInvoice, error: invoiceError } = await supabase.from('invoices').insert({
+        invoice_no: invoiceNo, invoice_date: new Date().toISOString().split('T')[0], customer_name: customerName,
+        subtotal_amount: subtotal, tax_amount: tax, total_amount: total, status: 'issued',
+    }).select().single();
+    if (invoiceError) throw new Error(`Failed to create invoice record: ${invoiceError.message}`);
+    if (!newInvoice) throw new Error('Failed to create invoice, no data returned.'); // FIX: Ensure newInvoice is not null
+
+    const invoiceItems: Omit<InvoiceItem, 'id'>[] = jobsToInvoice.map((job, index) => ({
+        invoiceId: newInvoice.id, jobId: job.id, description: `${job.title} (案件番号: ${job.job_number})`,
+        quantity: 1, unit: '式', unitPrice: job.price, lineTotal: job.price, sortIndex: index,
+    }));
+    const { error: itemsError } = await supabase.from('invoice_items').insert(invoiceItems.map(item => ({...item, invoice_id: item.invoiceId, job_id: item.jobId, unit_price: item.unitPrice, line_total: item.lineTotal, sort_index: item.sortIndex})));
+    if (itemsError) throw new Error(`Failed to create invoice items: ${itemsError.message}`);
+
+    const { error: updateJobsError } = await supabase.from('jobs').update({
+        invoice_id: newInvoice.id, invoice_status: InvoiceStatus.Invoiced, invoiced_at: new Date().toISOString(),
+    }).in('id', jobIds);
+    if (updateJobsError) throw new Error(`Failed to update jobs after invoicing: ${updateJobsError.message}`);
+
+    return { invoiceNo };
+};
+
+export const uploadFile = async (file: File | Blob, bucket: string, fileName: string): Promise<{ path: string }> => {
+    const supabase = getSupabase();
+    const fileToUpload = file instanceof File ? file : new File([file], fileName);
+    const filePath = `${Date.now()}-${fileToUpload.name}`;
+    const { data, error } = await supabase.storage.from(bucket).upload(filePath, fileToUpload);
+    if (error) throw new Error(`Failed to upload to ${bucket}: ${error.message}`);
+    if (!data) throw new Error(`File upload to ${bucket} returned no data.`); // FIX: Ensure data is not null
+    return { path: data.path };
+};
+
+export const getPublicUrl = (path: string, bucket: string): string | null => {
+    if (!path) return null;
+    const supabase = getSupabase();
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    return data.publicUrl;
+};
+
+
+export const getInboxItems = async (): Promise<InboxItem[]> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('inbox_items').select('*').order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch inbox items: ${error.message}`);
+
+    return (data || []).map(item => {
+        const url = getPublicUrl(item.file_path, 'inbox');
+        return {
+            id: item.id, fileUrl: url || '', extractedData: item.extracted_data, errorMessage: item.error_message,
+            createdAt: item.created_at, fileName: item.file_name, filePath: item.file_path, mimeType: item.mime_type, status: item.status,
+        }
+    });
+};
+
+export const addInboxItem = async (item: Omit<InboxItem, 'id' | 'createdAt' | 'fileUrl'>): Promise<InboxItem> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('inbox_items').insert({
+        file_name: item.fileName, file_path: item.filePath, mime_type: item.mimeType, status: item.status,
+        extracted_data: item.extractedData, error_message: item.errorMessage,
+    }).select().single();
+    if (error) throw new Error(`Failed to add inbox item: ${error.message}`);
+    if (!data) throw new Error('Failed to add inbox item, no data returned.'); // FIX: Ensure data is not null
+    return data as InboxItem;
+};
+
+export const updateInboxItem = async (id: string, updates: Partial<InboxItem>): Promise<InboxItem> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('inbox_items').update({
+        status: updates.status, extracted_data: updates.extractedData,
+    }).eq('id', id).select().single();
+    if (error) throw new Error(`Failed to update inbox item: ${error.message}`);
+    if (!data) throw new Error(`Inbox item with ID ${id} not found after update.`); // FIX: Ensure data is not null
+    
+    const url = getPublicUrl(data.file_path, 'inbox');
+    return { ...data, fileUrl: url || '', extractedData: data.extracted_data } as InboxItem;
+};
+
+export const deleteInboxItem = async (itemToDelete: InboxItem): Promise<void> => {
+    const supabase = getSupabase();
+    const { error: storageError } = await supabase.storage.from('inbox').remove([itemToDelete.filePath]);
+    if (storageError) console.error("Storage deletion failed, proceeding with DB deletion:", storageError);
+
+    const { error: dbError } = await supabase.from('inbox_items').delete().eq('id', itemToDelete.id);
+    if (dbError) throw new Error(`Failed to delete inbox item from DB: ${dbError.message}`);
+};
+
+export const updateJobReadyToInvoice = async (jobId: string, value: boolean): Promise<void> => {
+    const supabase = getSupabase();
+    const { error } = await supabase.from('jobs').update({ ready_to_invoice: value }).eq('id', jobId);
+    if (error) throw new Error(`Failed to update job ready status: ${error.message}`);
+};
+
+// --- AI Artifacts ---
+export const addAIArtifact = async (artifactData: Partial<Omit<AIArtifact, 'id' | 'createdAt' | 'updatedAt'>>): Promise<AIArtifact> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('ai_artifacts').insert(artifactData).select().single();
+    if (error) throw new Error(`Failed to add AI artifact: ${error.message}`);
+    if (!data) throw new Error('Failed to add AI artifact, no data returned.'); // FIX: Ensure data is not null
+    return dbAIArtifactToAIArtifact(data);
+};
+
+export const updateAIArtifact = async (id: string, updates: Partial<AIArtifact>): Promise<AIArtifact> => {
+    const supabase = getSupabase();
+    const dbUpdates = {
+      storage_path: updates.storage_path
+    };
+    const { data, error } = await supabase.from('ai_artifacts').update(dbUpdates).eq('id', id).select().single();
+    if (error) throw new Error(`Failed to update AI artifact: ${error.message}`);
+    if (!data) throw new Error(`AI artifact with ID ${id} not found after update.`); // FIX: Ensure data is not null
+    return dbAIArtifactToAIArtifact(data);
+};
+
+export const getAIArtifactsForLead = async (leadId: string): Promise<AIArtifact[]> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('ai_artifacts').select('*, created_by_user:created_by(name)').eq('lead_id', leadId).order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch AI artifacts for lead: ${error.message}`);
+    return (data || []).map(d => ({
+        ...dbAIArtifactToAIArtifact(d),
+        created_by_user: d.created_by_user || { name: '不明' }
+    }));
+};
+
+export const getAIArtifacts = async (): Promise<AIArtifact[]> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('ai_artifacts').select('*, created_by_user:created_by(name)').order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch AI artifacts: ${error.message}`);
+    return (data || []).map(d => ({
+        ...dbAIArtifactToAIArtifact(d),
+        created_by_user: d.created_by_user || { name: '不明' }
+    }));
+};
+
+// --- Analysis Projects ---
+
+export const getAnalysisProjects = async (): Promise<AnalysisProject[]> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('analysis_projects').select('*').order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch analysis projects: ${error.message}`);
+    return data || [];
+};
+
+export const addAnalysisProject = async (projectData: Partial<Omit<AnalysisProject, 'id' | 'created_at' | 'status'>>): Promise<AnalysisProject> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('analysis_projects').insert(projectData).select().single();
+    if (error) throw new Error(`Failed to add analysis project: ${error.message}`);
+    if (!data) throw new Error('Failed to add analysis project, no data returned.'); // FIX: Ensure data is not null
+    return data;
+};
+
+export const getDocuments = async (projectId: string): Promise<Document[]> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('documents').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch documents: ${error.message}`);
+    return data || [];
+};
+
+export const addDocument = async (docData: Partial<Omit<Document, 'id' | 'created_at'>>): Promise<Document> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('documents').insert(docData).select().single();
+    if (error) throw new Error(`Failed to add document: ${error.message}`);
+    if (!data) throw new Error('Failed to add document, no data returned.'); // FIX: Ensure data is not null
+    return data;
+};
+
+export const updateDocumentStatus = async (docId: string, status: Document['status']): Promise<void> => {
+    const supabase = getSupabase();
+    const { error } = await supabase.from('documents').update({ status }).eq('id', docId);
+    if (error) throw new Error(`Failed to update document status: ${error.message}`);
+};
+
+export const getBankScenarios = async (projectId: string): Promise<BankScenario[]> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('bank_scenarios').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch bank scenarios: ${error.message}`);
+    return data || [];
+};
+
+export const addBankScenario = async (scenarioData: Partial<Omit<BankScenario, 'id' | 'created_at'>>): Promise<BankScenario> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('bank_scenarios').insert(scenarioData).select().single();
+    if (error) throw new Error(`Failed to add bank scenario: ${error.message}`);
+    if (!data) throw new Error('Failed to add bank scenario, no data returned.'); // FIX: Ensure data is not null
+    return data;
+};
+
+export const getBankSimulations = async (scenarioId: string): Promise<BankSimulation[]> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('bank_simulations').select('*').eq('scenario_id', scenarioId).order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch bank simulations: ${error.message}`);
+    return data || [];
+};
+
+export const addBankSimulation = async (simulationData: Partial<Omit<BankSimulation, 'id' | 'created_at' | 'completed_at'>>): Promise<BankSimulation> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('bank_simulations').insert(simulationData).select().single();
+    if (error) throw new Error(`Failed to add bank simulation: ${error.message}`);
+    if (!data) throw new Error('Failed to add bank simulation, no data returned.'); // FIX: Ensure data is not null
+    return data;
+};
+
+export const getUserActivityLogs = async (userId: string): Promise<UserActivityLog[]> => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('user_activity_logs').select('*, user:user_id(name)').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to fetch user activity logs: ${error.message}`);
+    return (data || []).map(d => ({
+        id: d.id,
+        user_id: d.user_id,
+        action: d.action,
+        details: d.details,
+        created_at: d.created_at,
+        user: d.user || { name: '不明' }
+    }));
+};

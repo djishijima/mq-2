@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import Sidebar from './components/Sidebar';
+import { CustomerList } from './components/CustomerList';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import JobList from './components/JobList';
 import CreateJobModal from './components/CreateJobModal';
 import JobDetailModal from './components/JobDetailModal';
-import CustomerList from './components/CustomerList';
 import CustomerDetailModal from './components/CustomerDetailModal';
 import { CompanyAnalysisModal } from './components/CompanyAnalysisModal';
 import LeadManagementPage from './components/sales/LeadManagementPage';
@@ -27,7 +26,7 @@ import CreatePurchaseOrderModal from './components/purchasing/CreatePurchaseOrde
 import EstimateManagementPage from './components/sales/EstimateManagementPage';
 import SalesRanking from './components/accounting/SalesRanking';
 import BusinessPlanPage from './components/accounting/BusinessPlanPage';
-import ApprovalWorkflowPage from './components/accounting/ApprovalWorkflowPage';
+import { ApprovalWorkflowPage } from './components/accounting/ApprovalWorkflowPage';
 import BusinessSupportPage from './components/BusinessSupportPage';
 import AIChatPage from './components/AIChatPage';
 import MarketResearchPage from './components/MarketResearchPage';
@@ -39,7 +38,7 @@ import ManufacturingCostManagement from './components/accounting/ManufacturingCo
 import AuditLogPage from './components/admin/AuditLogPage';
 import JournalQueuePage from './components/admin/JournalQueuePage';
 import MasterManagementPage from './components/admin/MasterManagementPage';
-import DatabaseSetupInstructionsModal from './components/DatabaseSetupInstructionsModal'; // FIX: Removed default import
+import DatabaseSetupInstructionsModal from './components/DatabaseSetupInstructionsModal';
 import AIImageStudioPage from './components/AIImageStudioPage';
 import AIImageGenerationPage from './components/AIImageGenerationPage';
 import Chatbot from './components/Chatbot';
@@ -124,7 +123,7 @@ const PAGE_TITLES: Record<Page, string> = {
     accounting_analysis_simulation: '財務シミュレーション',
 };
 
-const App: React.FC = () => {
+export const App: React.FC = () => {
     const [currentPage, setCurrentPage] = useState<Page>('analysis_dashboard');
     const [searchTerm, setSearchTerm] = useState('');
     const [jobs, setJobs] = useState<Job[]>([]);
@@ -167,7 +166,7 @@ const App: React.FC = () => {
 
     const [isCompanyAnalysisModalOpen, setIsCompanyAnalysisModalOpen] = useState(false);
     const [companyAnalysisResult, setCompanyAnalysisResult] = useState<any>(null);
-    const [isCompanyAnalysisLoading, setIsCompanyAnalysisLoading] = useState(false); // FIX: Corrected state setter name
+    const [isCompanyAnalysisLoading, setIsCompanyAnalysisLoading] = useState(false);
     const [companyAnalysisError, setCompanyAnalysisError] = useState('');
 
     const [isCreateLeadModalOpen, setIsCreateLeadModalOpen] = useState(false);
@@ -407,6 +406,7 @@ const App: React.FC = () => {
         try {
             await dataService.addJob(jobData);
             addToast('案件を追加しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'job_added', { title: jobData.title, clientName: jobData.clientName });
             await fetchAllData();
         } catch (error: any) {
             addToast(`案件の追加に失敗しました: ${error.message}`, 'error');
@@ -414,48 +414,68 @@ const App: React.FC = () => {
     }, [addToast, fetchAllData, currentUser]);
 
     const handleUpdateJob = useCallback(async (jobId: string, updatedData: Partial<Job>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.updateJob(jobId, updatedData);
             addToast('案件を更新しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'job_updated', { jobId, updates: updatedData });
             await fetchAllData();
         } catch (error: any) {
             addToast(`案件の更新に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleDeleteJob = useCallback(async (jobId: string) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.deleteJob(jobId);
             addToast('案件を削除しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'job_deleted', { jobId });
             await fetchAllData();
         } catch (error: any) {
             addToast(`案件の削除に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleAddCustomer = useCallback(async (customerData: Partial<Customer>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.addCustomer(customerData);
             addToast('顧客を登録しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'customer_added', { customerName: customerData.customerName });
             await fetchAllData();
             setIsCustomerDetailModalOpen(false);
             setCustomerDetailMode('view');
         } catch (error: any) {
             addToast(`顧客の登録に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleUpdateCustomer = useCallback(async (customerId: string, updatedData: Partial<Customer>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.updateCustomer(customerId, updatedData);
             addToast('顧客情報を更新しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'customer_updated', { customerId, updates: updatedData });
             await fetchAllData();
             setIsCustomerDetailModalOpen(false);
             setCustomerDetailMode('view');
         } catch (error: any) {
             addToast(`顧客情報の更新に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleAnalyzeCustomer = useCallback(async (customer: Customer) => {
         if (isAIOff) {
@@ -467,7 +487,7 @@ const App: React.FC = () => {
             return;
         }
         setIsCompanyAnalysisModalOpen(true);
-        setIsCompanyAnalysisLoading(true); // FIX: Corrected state setter name
+        setIsCompanyAnalysisLoading(true);
         setCompanyAnalysisError('');
         setCompanyAnalysisResult(null);
         try {
@@ -475,227 +495,334 @@ const App: React.FC = () => {
             setCompanyAnalysisResult(analysis);
             await dataService.updateCustomer(customer.id, { aiAnalysis: analysis });
             addToast('企業分析が完了しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'ai_company_analysis_completed', { customerId: customer.id });
         } catch (error: any) {
             setCompanyAnalysisError(error.message || 'AI企業分析に失敗しました。');
             addToast(`AI企業分析に失敗しました: ${error.message}`, 'error');
+            await dataService.logUserActivity(currentUser.id, 'ai_company_analysis_failed', { customerId: customer.id, error: error.message });
         } finally {
-            setIsCompanyAnalysisLoading(false); // FIX: Corrected state setter name
+            setIsCompanyAnalysisLoading(false);
         }
     }, [addToast, isAIOff, currentUser]);
 
     const handleAddLead = useCallback(async (leadData: Partial<Lead>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.addLead(leadData);
             addToast('リードを追加しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'lead_added', { company: leadData.company, name: leadData.name });
             await fetchAllData();
             setIsCreateLeadModalOpen(false);
         } catch (error: any) {
             addToast(`リードの追加に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleUpdateLead = useCallback(async (leadId: string, updatedData: Partial<Lead>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.updateLead(leadId, updatedData);
             addToast('リードを更新しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'lead_updated', { leadId, updates: updatedData });
             await fetchAllData();
         } catch (error: any) {
             addToast(`リードの更新に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleDeleteLead = useCallback(async (leadId: string) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.deleteLead(leadId);
             addToast('リードを削除しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'lead_deleted', { leadId });
             await fetchAllData();
         } catch (error: any) {
             addToast(`リードの削除に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleAddEntry = useCallback(async (entryData: Omit<JournalEntry, 'id' | 'date'>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.addJournalEntry({ ...entryData, date: new Date().toISOString().split('T')[0] });
             addToast('仕訳を追加しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'journal_entry_added', { account: entryData.account, debit: entryData.debit, credit: entryData.credit });
             await fetchAllData();
         } catch (error: any) {
             addToast(`仕訳の追加に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleAddPurchaseOrder = useCallback(async (orderData: Omit<PurchaseOrder, 'id'>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.addPurchaseOrder(orderData);
             addToast('発注を追加しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'purchase_order_added', { supplierName: orderData.supplierName, itemName: orderData.itemName });
             await fetchAllData();
             setIsCreatePurchaseOrderModalOpen(false);
         } catch (error: any) {
             addToast(`発注の追加に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleAddInventoryItem = useCallback(async (itemData: Omit<InventoryItem, 'id'>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.addInventoryItem(itemData);
             addToast('在庫品目を追加しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'inventory_item_added', { name: itemData.name });
             await fetchAllData();
             setIsCreateInventoryItemModalOpen(false);
         } catch (error: any) {
             addToast(`在庫品目の追加に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleUpdateInventoryItem = useCallback(async (itemId: string, itemData: Partial<InventoryItem>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.updateInventoryItem(itemId, itemData);
             addToast('在庫品目を更新しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'inventory_item_updated', { itemId, updates: itemData });
             await fetchAllData();
             setIsCreateInventoryItemModalOpen(false);
         } catch (error: any) {
             addToast(`在庫品目の更新に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleMarkPaid = useCallback(async (invoice: Invoice) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.updateInvoice(invoice.id, { status: 'paid', paidAt: new Date().toISOString() });
             addToast(`請求書 ${invoice.invoiceNo} を入金済みにしました。`, 'success');
+            await dataService.logUserActivity(currentUser.id, 'invoice_marked_paid', { invoiceId: invoice.id, invoiceNo: invoice.invoiceNo });
             await fetchAllData();
         } catch (error: any) {
             addToast(`請求書の更新に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleSaveAccountItem = useCallback(async (item: Partial<AccountItem>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.saveAccountItem(item);
             addToast('勘定科目を保存しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'account_item_saved', { name: item.name });
             await fetchAllData();
         } catch (error: any) {
             addToast(`勘定科目の保存に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleDeleteAccountItem = useCallback(async (id: string) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.deactivateAccountItem(id); // Deactivate instead of hard delete
             addToast('勘定科目を無効化しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'account_item_deactivated', { id });
             await fetchAllData();
         } catch (error: any) {
             addToast(`勘定科目の無効化に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleSavePaymentRecipient = useCallback(async (item: Partial<PaymentRecipient>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.savePaymentRecipient(item);
             addToast('支払先を保存しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'payment_recipient_saved', { name: item.companyName || item.recipientName });
             await fetchAllData();
         } catch (error: any) {
             addToast(`支払先の保存に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleDeletePaymentRecipient = useCallback(async (id: string) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.deletePaymentRecipient(id);
             addToast('支払先を削除しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'payment_recipient_deleted', { id });
             await fetchAllData();
         } catch (error: any) {
             addToast(`支払先の削除に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleSaveAllocationDivision = useCallback(async (item: Partial<AllocationDivision>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.saveAllocationDivision(item);
             addToast('振分区分を保存しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'allocation_division_saved', { name: item.name });
             await fetchAllData();
         } catch (error: any) {
             addToast(`振分区分の保存に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleDeleteAllocationDivision = useCallback(async (id: string) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.deleteAllocationDivision(id);
             addToast('振分区分を削除しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'allocation_division_deleted', { id });
             await fetchAllData();
         } catch (error: any) {
             addToast(`振分区分の削除に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleSaveDepartment = useCallback(async (item: Partial<Department>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.saveDepartment(item);
             addToast('部署を保存しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'department_saved', { name: item.name });
             await fetchAllData();
         } catch (error: any) {
             addToast(`部署の保存に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleDeleteDepartment = useCallback(async (id: string) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.deleteDepartment(id);
             addToast('部署を削除しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'department_deleted', { id });
             await fetchAllData();
         } catch (error: any) {
             addToast(`部署の削除に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleSaveTitle = useCallback(async (item: Partial<Title>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.saveTitle(item);
             addToast('役職を保存しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'title_saved', { name: item.name });
             await fetchAllData();
         } catch (error: any) {
             addToast(`役職の保存に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleDeleteTitle = useCallback(async (id: string) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.deleteTitle(id);
             addToast('役職を削除しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'title_deleted', { id });
             await fetchAllData();
         } catch (error: any) {
             addToast(`役職の削除に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleAddEstimate = useCallback(async (estimateData: Partial<Estimate>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.addEstimate(estimateData);
             addToast('見積を保存しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'estimate_added', { title: estimateData.title, customerName: estimateData.customerName });
             await fetchAllData();
         } catch (error: any) {
             addToast(`見積の保存に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleUpdateEstimate = useCallback(async (id: string, estimateData: Partial<Estimate>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.updateEstimate(id, estimateData);
             addToast('見積を更新しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'estimate_updated', { estimateId: id, updates: estimateData });
             await fetchAllData();
         } catch (error: any) {
             addToast(`見積の更新に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleUpdateBugReport = useCallback(async (id: string, updates: Partial<BugReport>) => {
+        if (!currentUser) {
+            addToast('ユーザー情報が見つかりません。', 'error');
+            return;
+        }
         try {
             await dataService.updateBugReport(id, updates);
             addToast('報告を更新しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'bug_report_updated', { bugReportId: id, updates });
             await fetchAllData();
         } catch (error: any) {
             addToast(`報告の更新に失敗しました: ${error.message}`, 'error');
         }
-    }, [addToast, fetchAllData]);
+    }, [addToast, fetchAllData, currentUser]);
 
     const handleAddBugReport = useCallback(async (report: Omit<BugReport, 'id' | 'created_at' | 'status' | 'reporter_name'>) => {
         if (!currentUser) {
@@ -705,6 +832,7 @@ const App: React.FC = () => {
         try {
             await dataService.addBugReport({ ...report, reporterName: currentUser.name, status: '未対応' });
             addToast('バグ報告・改善要望を受け付けました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'bug_report_added', { summary: report.summary, type: report.reportType });
             await fetchAllData();
         } catch (error: any) {
             addToast(`報告の送信に失敗しました: ${error.message}`, 'error');
@@ -863,5 +991,3 @@ const App: React.FC = () => {
         </div>
     );
 };
-
-export default App;

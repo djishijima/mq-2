@@ -18,7 +18,7 @@ interface CustomerListProps {
   isAIOff: boolean;
 }
 
-const CustomerList: React.FC<CustomerListProps> = ({ customers, searchTerm, onSelectCustomer, onUpdateCustomer, onAnalyzeCustomer, addToast, currentUser, onNewCustomer, isAIOff }) => {
+export const CustomerList: React.FC<CustomerListProps> = ({ customers, searchTerm, onSelectCustomer, onUpdateCustomer, onAnalyzeCustomer, addToast, currentUser, onNewCustomer, isAIOff }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'customerName', direction: 'ascending' });
   const [isGeneratingEmail, setIsGeneratingEmail] = useState<string | null>(null);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -88,7 +88,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ customers, searchTerm, onSe
       }
     } catch (error) {
       if (mounted.current) {
-          addToast(error instanceof Error ? error.message : 'メール作成に失敗しました', 'error');
+          addToast(error instanceof Error ? error.message : 'メール作成に失敗しました。', 'error');
       }
     } finally {
       if (mounted.current) {
@@ -186,66 +186,90 @@ const CustomerList: React.FC<CustomerListProps> = ({ customers, searchTerm, onSe
               <SortableHeader sortKey="phoneNumber" label="電話番号" sortConfig={sortConfig} requestSort={requestSort} />
               <SortableHeader sortKey="address1" label="住所" sortConfig={sortConfig} requestSort={requestSort} />
               <SortableHeader sortKey="websiteUrl" label="Webサイト" sortConfig={sortConfig} requestSort={requestSort} />
-              <th scope="col" className="px-6 py-3 font-medium text-center">操作</th>
+              <th scope="col" className="px-6 py-3">操作</th>
             </tr>
           </thead>
           <tbody>
-            {sortedCustomers.map((customer) => {
-              const isEditing = editingRowId === customer.id;
-              return (
-              <tr key={customer.id} onClick={() => onSelectCustomer(customer)} className="group bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 odd:bg-slate-50 dark:odd:bg-slate-800/50 cursor-pointer">
-                <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-200">
-                  {isEditing ? <InlineEditInput name="customerName" value={editedData.customerName} onChange={handleFieldChange} /> : customer.customerName}
+            {sortedCustomers.map(customer => (
+              <tr key={customer.id} onClick={() => onSelectCustomer(customer)} className="group bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 cursor-pointer odd:bg-slate-50 dark:odd:bg-slate-800/50">
+                <td className="px-6 py-4">
+                  {editingRowId === customer.id ? (
+                    <InlineEditInput name="customerName" value={editedData.customerName} onChange={handleFieldChange} />
+                  ) : (
+                    <div className="font-semibold text-slate-800 dark:text-slate-200">{customer.customerName}</div>
+                  )}
                 </td>
                 <td className="px-6 py-4">
-                    {isEditing ? <InlineEditInput name="phoneNumber" value={editedData.phoneNumber} onChange={handleFieldChange} /> : customer.phoneNumber || '-'}
+                  {editingRowId === customer.id ? (
+                    <InlineEditInput name="phoneNumber" value={editedData.phoneNumber} onChange={handleFieldChange} />
+                  ) : (
+                    customer.phoneNumber || '-'
+                  )}
                 </td>
-                <td className="px-6 py-4 truncate max-w-sm">
-                    {isEditing ? <InlineEditInput name="address1" value={editedData.address1} onChange={handleFieldChange} /> : customer.address1 || '-'}
+                <td className="px-6 py-4">
+                  {editingRowId === customer.id ? (
+                    <InlineEditInput name="address1" value={editedData.address1} onChange={handleFieldChange} />
+                  ) : (
+                    customer.address1 || '-'
+                  )}
                 </td>
-                <td className="px-6 py-4 truncate max-w-xs">
-                    {isEditing ? <InlineEditInput name="websiteUrl" value={editedData.websiteUrl} onChange={handleFieldChange} /> : (
-                      customer.websiteUrl ? <a href={customer.websiteUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-blue-600 hover:underline">{customer.websiteUrl}</a> : '-'
-                    )}
+                <td className="px-6 py-4">
+                  {editingRowId === customer.id ? (
+                    <InlineEditInput name="websiteUrl" value={editedData.websiteUrl} onChange={handleFieldChange} />
+                  ) : (
+                    customer.websiteUrl ? (
+                      <a href={customer.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <Link className="w-4 h-4" /> 訪問
+                      </a>
+                    ) : '-'
+                  )}
                 </td>
                 <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        {isEditing ? (
-                            <>
-                                <button onClick={handleSaveEdit} disabled={isSaving} className="p-2 rounded-full text-slate-500 hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-900/50" title="保存">
-                                    {isSaving ? <Loader className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-                                </button>
-                                <button onClick={handleCancelEdit} className="p-2 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/50" title="キャンセル">
-                                    <X className="w-5 h-5"/>
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                <button onClick={() => onSelectCustomer(customer)} className="p-2 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700" title="詳細表示"><Eye className="w-5 h-5"/></button>
-                                <button onClick={(e) => handleEditClick(e, customer)} className="p-2 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700" title="インライン編集"><Pencil className="w-5 h-5"/></button>
-                                {!isAIOff && <button onClick={(e) => handleEnrich(e, customer)} disabled={enrichingId === customer.id} className="p-2 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700" title="AIで企業情報補完">
-                                    {enrichingId === customer.id ? <Loader className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-                                </button>}
-                                <button onClick={(e) => {e.stopPropagation(); onAnalyzeCustomer(customer)}} disabled={isAIOff} className="p-2 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50" title="AI企業分析"><Lightbulb className="w-5 h-5"/></button>
-                                <button onClick={(e) => handleGenerateProposal(e, customer)} disabled={isGeneratingEmail === customer.id || isAIOff} className="p-2 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50" title="提案メール作成">
-                                  {isGeneratingEmail === customer.id ? <Loader className="w-5 h-5 animate-spin" /> : <Mail className="w-5 h-5" />}
-                                </button>
-                            </>
-                        )}
-                    </div>
+                  <div className="flex justify-center items-center opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100" onClick={e => e.stopPropagation()}>
+                    {editingRowId === customer.id ? (
+                      <div className="flex items-center gap-2">
+                        <button onClick={handleSaveEdit} disabled={isSaving} className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/50 rounded-full">
+                          {isSaving ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        </button>
+                        <button onClick={handleCancelEdit} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full">
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button onClick={() => onSelectCustomer(customer)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full" title="詳細表示">
+                          <Eye className="w-5 h-5"/>
+                        </button>
+                        <button onClick={(e) => handleEditClick(e, customer)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full" title="クイック編集">
+                          <Pencil className="w-5 h-5"/>
+                        </button>
+                        <DropdownMenu>
+                            <DropdownMenuItem onClick={() => onAnalyzeCustomer(customer)} disabled={isAIOff}>
+                                <Lightbulb className="w-4 h-4" /> AI企業分析
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleEnrich(e, customer)} disabled={isAIOff || enrichingId === customer.id}>
+                                {enrichingId === customer.id ? <Loader className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4"/>} AIで情報補完
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleGenerateProposal(e, customer)} disabled={isAIOff || isGeneratingEmail === customer.id}>
+                                {isGeneratingEmail === customer.id ? <Loader className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} AI提案メール作成
+                            </DropdownMenuItem>
+                        </DropdownMenu>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
-            )})}
-             {sortedCustomers.length === 0 && (
-              <tr>
-                <td colSpan={5}>
-                    <EmptyState 
-                        icon={Users}
-                        title="検索結果がありません"
-                        message="検索条件を変更して、もう一度お試しください。"
-                    />
-                </td>
-              </tr>
+            ))}
+            {sortedCustomers.length === 0 && (
+                <tr>
+                    <td colSpan={6}>
+                        <EmptyState 
+                            icon={Users}
+                            title="検索結果がありません"
+                            message="検索条件を変更して、もう一度お試しください。"
+                        />
+                    </td>
+                </tr>
             )}
           </tbody>
         </table>
@@ -253,5 +277,3 @@ const CustomerList: React.FC<CustomerListProps> = ({ customers, searchTerm, onSe
     </div>
   );
 };
-
-export default React.memo(CustomerList);

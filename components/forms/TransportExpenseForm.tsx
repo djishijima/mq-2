@@ -200,4 +200,30 @@ const TransportExpenseForm: React.FC<TransportExpenseFormProps> = ({ onSuccess, 
                                         </td>
                                         <td className="p-1 min-w-[120px]"><input type="number" value={item.amount} onChange={e => handleDetailChange(item.id, 'amount', Number(e.target.value))} className={`${inputClass} text-right`} disabled={isDisabled} /></td>
                                         <td className="text-center p-1">
-                                            <button type="button" onClick={() => handleRemoveRow(item.id)} className="p
+                                            <button type="button" onClick={() => handleRemoveRow(item.id)} className="p-1 text-slate-400 hover:text-red-500" disabled={isDisabled}>
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <ApprovalRouteSelector onChange={setApprovalRouteId} isSubmitting={isDisabled} />
+
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+                
+                <div className="flex justify-end gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <button type="button" className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600" disabled={isDisabled}>下書き保存</button>
+                    <button type="submit" className="w-40 flex justify-center items-center bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-slate-400" disabled={isDisabled}>
+                        {isSubmitting ? <Loader className="w-5 h-5 animate-spin" /> : '申請を送信する'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+};
+
+export default TransportExpenseForm;
