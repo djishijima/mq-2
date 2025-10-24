@@ -61,6 +61,9 @@ export interface DemoDataState {
   documents: Document[];
   bankScenarios: BankScenario[];
   bankSimulations: BankSimulation[];
+  allocationDivisions: AllocationDivision[]; // Added missing property
+  titles: any[]; // Added missing property
+  aiArtifacts: AIArtifact[]; // Added missing property
 }
 
 const clone = <T>(value: T): T => {
@@ -646,3 +649,273 @@ export const createDemoDataState = (): DemoDataState => {
         },
       ]),
       totalAmount: 480000,
+      deliveryDate: '2025-10-30',
+      paymentTerms: '月末締め翌月末払い',
+      deliveryMethod: 'オフィスへ直送',
+      notes: 'ロゴデータは支給',
+      status: EstimateStatus.Draft,
+      version: 1,
+      createdBy: 'user-002',
+      user: employeeUsers[1],
+      createdAt: '2025-09-28T09:00:00Z',
+      updatedAt: '2025-09-28T09:00:00Z',
+      leadId: null,
+      customerId: 'cus-002',
+      bodyMd: null,
+      jsonData: null,
+      pdfPath: null,
+      estimateDate: null,
+    },
+  ];
+
+  const invoices: Invoice[] = [
+    {
+      id: 'inv-001',
+      invoiceNo: '202509-001',
+      invoiceDate: '2025-09-12',
+      dueDate: '2025-10-31',
+      customerName: '株式会社リンクス',
+      subtotalAmount: 1250000,
+      taxAmount: 125000,
+      totalAmount: 1375000,
+      status: 'issued',
+      createdAt: '2025-09-12T00:00:00Z',
+      paidAt: null,
+      items: [
+        {
+          id: 'invitem-001',
+          invoiceId: 'inv-001',
+          jobId: 'job-003',
+          description: '商品カタログ2025 (案件番号: 20240818)',
+          quantity: 1,
+          unit: '式',
+          unitPrice: 1250000,
+          lineTotal: 1250000,
+          sortIndex: 0,
+        },
+      ],
+    },
+  ];
+
+  const inboxItems: InboxItem[] = [
+    {
+      id: 'inbox-001',
+      fileName: '領収書_カフェ20251005.jpg',
+      filePath: 'receipts/cafe_20251005.jpg',
+      fileUrl: '/path/to/receipts/cafe_20251005.jpg',
+      mimeType: 'image/jpeg',
+      status: InboxItemStatus.PendingReview,
+      extractedData: {
+        vendorName: 'カフェ・デ・エクセル',
+        invoiceDate: '2025-10-05',
+        totalAmount: 1200,
+        description: '打ち合わせ コーヒー代',
+        costType: 'F',
+        account: '会議費',
+      },
+      errorMessage: null,
+      createdAt: '2025-10-05T08:00:00Z',
+    },
+    {
+      id: 'inbox-002',
+      fileName: '請求書_運送20250930.pdf',
+      filePath: 'inbox/delivery_20250930.pdf',
+      fileUrl: '/path/to/inbox/delivery_20250930.pdf',
+      mimeType: 'application/pdf',
+      status: InboxItemStatus.Processing,
+      extractedData: null,
+      errorMessage: null,
+      createdAt: '2025-09-30T15:30:00Z',
+    },
+  ];
+
+  const departments: Department[] = [
+    { id: 'dept-001', name: '営業部' },
+    { id: 'dept-002', name: '製造部' },
+    { id: 'dept-003', name: '経理部' },
+    { id: 'dept-004', name: '総務部' },
+  ];
+
+  const paymentRecipients: PaymentRecipient[] = [
+    { id: 'payrec-001', recipientCode: '001', companyName: '東都紙業株式会社', recipientName: null },
+    { id: 'payrec-002', recipientCode: '002', companyName: '京浜加工サービス', recipientName: null },
+  ];
+
+  const employees: Employee[] = [
+    { id: 'emp-001', name: '田中 翔', department: '営業部', title: 'マネージャー', hireDate: '2023-01-15', salary: 450000, createdAt: '2023-01-15T00:00:00Z' },
+    { id: 'emp-002', name: '高橋 美咲', department: '営業部', title: 'シニアセールス', hireDate: '2023-05-12', salary: 380000, createdAt: '2023-05-12T00:00:00Z' },
+    { id: 'emp-003', name: '佐々木 大樹', department: '製造部', title: '工場長', hireDate: '2022-11-01', salary: 550000, createdAt: '2022-11-01T00:00:00Z' },
+  ];
+
+  const userActivityLogs: UserActivityLog[] = [
+    {
+      id: 'log-001',
+      user_id: 'user-001',
+      action: 'application_approved',
+      details: { applicationId: 'app-001', nextStatus: 'approved', currentLevel: 1, nextLevel: 2, comment: '問題なし' },
+      created_at: '2025-10-04T03:00:00Z',
+      user: { name: '田中 翔' },
+    },
+    {
+      id: 'log-002',
+      user_id: 'user-002',
+      action: 'ai_job_suggestion_finish',
+      details: { prompt: 'カフェのA4チラシ作成', response: { title: 'カフェオープンチラシ' } },
+      created_at: '2025-10-03T10:00:00Z',
+      user: { name: '高橋 美咲' },
+    },
+  ];
+
+  const approvalHistory: ApprovalHistory[] = [
+    {
+      id: 'apphist-001',
+      application_id: 'app-001',
+      user_id: 'user-002',
+      action: 'submitted',
+      comment: '経費精算申請を提出',
+      created_at: '2025-10-04T02:45:00Z',
+      user: { name: '高橋 美咲' },
+    },
+    {
+      id: 'apphist-002',
+      application_id: 'app-001',
+      user_id: 'user-001',
+      action: 'approved',
+      comment: '確認の上、承認しました。',
+      created_at: '2025-10-04T03:00:00Z',
+      user: { name: '田中 翔' },
+    },
+  ];
+
+  const analysisProjects: AnalysisProject[] = [
+    {
+      id: 'proj-001',
+      name: '新規事業参入分析',
+      objective: '未設定',
+      created_by: 'user-001',
+      status: 'ready',
+      created_at: '2025-01-01T00:00:00Z',
+    },
+  ];
+
+  const documents: Document[] = [
+    {
+      id: 'doc-001',
+      project_id: 'proj-001',
+      file_name: '2024年度_決算報告書.pdf',
+      file_path: 'ai/proj-001/2024_financial_report.pdf',
+      mime_type: 'application/pdf',
+      status: 'processed',
+      extracted_text: 'これは2024年度の決算報告書のテキスト抽出結果です。売上高は前年比10%増...',
+      created_at: '2025-01-10T00:00:00Z',
+    },
+  ];
+
+  const bankScenarios: BankScenario[] = [
+    {
+      id: 'scenario-001',
+      project_id: 'proj-001',
+      name: '運転資金借入計画',
+      sim_type: '借入枠',
+      assumptions: {
+        currentCash: 5000000,
+        monthlyExpenses: 15000000,
+        desiredMonthsCoverage: 3,
+      },
+      created_at: '2025-02-01T00:00:00Z',
+      created_by: 'user-001',
+    },
+  ];
+
+  const bankSimulations: BankSimulation[] = [
+    {
+      id: 'sim-001',
+      scenario_id: 'scenario-001',
+      inputs: {
+        documents: ['doc-001'],
+        assumptions: {
+          currentCash: 5000000,
+          monthlyExpenses: 15000000,
+          desiredMonthsCoverage: 3,
+        },
+      },
+      outputs: {
+        summary: '運転資金として約4,000万円の借入枠が妥当と試算されます。',
+        result: {
+          recommendedLoanAmount: 40000000,
+          details: '詳細な計算結果...',
+        },
+      },
+      source_artifacts: [{ file_id: 'doc-001', file_name: '2024年度_決算報告書.pdf' }],
+      status: 'succeeded',
+      created_at: '2025-02-05T00:00:00Z',
+      completed_at: '2025-02-05T00:05:00Z',
+    },
+  ];
+
+  const allocationDivisions: AllocationDivision[] = [
+    { id: 'alloc-001', name: '本社経費', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
+    { id: 'alloc-002', name: '営業部経費', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
+  ];
+
+  const titles: any[] = [
+    { id: 'title-001', name: '代表取締役', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
+    { id: 'title-002', name: '部長', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
+  ];
+
+  const aiArtifacts: AIArtifact[] = [
+    {
+      id: 'arti-001',
+      project_id: 'proj-001',
+      kind: 'analysis',
+      title: '2024年度 経営状況分析',
+      content_json: { revenue: 'up', costs: 'stable' },
+      body_md: 'AIによる2024年度の経営分析サマリー...',
+      created_by: 'user-001',
+      createdAt: '2025-01-15T00:00:00Z',
+      updatedAt: '2025-01-15T00:00:00Z',
+    },
+    {
+      id: 'arti-002',
+      project_id: null,
+      kind: 'proposal',
+      title: '株式会社アーク向けイベントパンフレット提案',
+      content_json: { sections: ['背景', '提案内容', '費用'] },
+      body_md: 'イベントパンフレットの制作に関するAI提案書ドラフト...',
+      created_by: 'user-002',
+      lead_id: 'lead-001',
+      createdAt: '2025-09-20T00:00:00Z',
+      updatedAt: '2025-09-20T00:00:00Z',
+    },
+  ];
+
+  return {
+    jobs,
+    customers,
+    journalEntries,
+    accountItems,
+    leads,
+    approvalRoutes,
+    purchaseOrders,
+    inventoryItems,
+    employees,
+    employeeUsers,
+    bugReports,
+    estimates,
+    applications,
+    applicationCodes,
+    invoices,
+    inboxItems,
+    departments,
+    paymentRecipients,
+    userActivityLogs,
+    approvalHistory,
+    analysisProjects,
+    documents,
+    bankScenarios,
+    bankSimulations,
+    allocationDivisions,
+    titles,
+    aiArtifacts,
+  };
+};

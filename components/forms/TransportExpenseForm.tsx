@@ -86,9 +86,9 @@ const TransportExpenseForm: React.FC<TransportExpenseFormProps> = ({ onSuccess, 
         setIsOcrLoading(true);
         setError('');
         try {
-            const base64String = await readFileAsBase64(file);
+            const base64String = await readFileAsBase64(file as File); // Explicitly type file as File
             // FIX: Pass currentUser.id to extractInvoiceDetails
-            const ocrData: InvoiceData = await extractInvoiceDetails(base64String, file.type, currentUser.id);
+            const ocrData: InvoiceData = await extractInvoiceDetails(base64String, (file as File).type, currentUser.id);
             
             // Heuristic to parse departure/arrival from description
             const description = ocrData.description || '';
@@ -200,43 +200,4 @@ const TransportExpenseForm: React.FC<TransportExpenseFormProps> = ({ onSuccess, 
                                         </td>
                                         <td className="p-1 min-w-[120px]"><input type="number" value={item.amount} onChange={e => handleDetailChange(item.id, 'amount', Number(e.target.value))} className={`${inputClass} text-right`} disabled={isDisabled} /></td>
                                         <td className="text-center p-1">
-                                            <button type="button" onClick={() => handleRemoveRow(item.id)} className="p-1 text-slate-400 hover:text-red-500" disabled={isDisabled}><Trash2 className="w-4 h-4" /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                        <button type="button" onClick={addNewRow} className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700" disabled={isDisabled}>
-                            <PlusCircle className="w-4 h-4" /> 行を追加
-                        </button>
-                        <div className="text-right">
-                            <span className="text-sm text-slate-500 dark:text-slate-400">合計金額: </span>
-                            <span className="text-xl font-bold text-slate-800 dark:text-white">¥{totalAmount.toLocaleString()}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <label htmlFor="notes" className="block text-base font-semibold text-slate-700 dark:text-slate-200 mb-2">備考</label>
-                    <textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} rows={3} className={inputClass} placeholder="補足事項があれば入力してください。" disabled={isDisabled} />
-                </div>
-
-                <ApprovalRouteSelector onChange={setApprovalRouteId} isSubmitting={isDisabled} />
-
-                {error && <p className="text-red-500 text-sm bg-red-100 dark:bg-red-900/50 p-3 rounded-lg">{error}</p>}
-
-                <div className="flex justify-end gap-4 pt-6 border-t border-slate-200 dark:border-slate-700">
-                    <button type="button" onClick={clearForm} className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600" disabled={isDisabled}>内容をクリア</button>
-                    <button type="button" className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600" disabled={isDisabled}>下書き保存</button>
-                    <button type="submit" className="w-40 flex justify-center items-center bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-slate-400" disabled={isDisabled}>
-                        {isSubmitting ? <Loader className="w-5 h-5 animate-spin" /> : '申請を送信する'}
-                    </button>
-                </div>
-            </form>
-        </div>
-    );
-};
-
-export default TransportExpenseForm;
+                                            <button type="button" onClick={() => handleRemoveRow(item.id)} className="p

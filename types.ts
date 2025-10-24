@@ -1,3 +1,4 @@
+// DO NOT USE OR IMPORT: GoogleGenerativeAI, google.generativeai, models.create, ai.models.create, models.getGenerativeModel, ai.models.getModel, ai.models['model_name'], generationConfig, GoogleGenAIError, GenerateContentRequest; USE GenerateContentResponse and GenerateContentParameters.
 export type Page =
   | 'analysis_dashboard' | 'sales_leads' | 'sales_customers' | 'sales_pipeline'
   | 'sales_estimates' | 'sales_orders' | 'sales_billing' | 'analysis_ranking'
@@ -7,7 +8,8 @@ export type Page =
   | 'approval_list' | 'approval_form_expense' | 'approval_form_transport' | 'approval_form_leave'
   | 'approval_form_approval' | 'approval_form_daily' | 'approval_form_weekly'
   | 'accounting_journal' | 'accounting_general_ledger' | 'accounting_trial_balance'
-  | 'accounting_tax_summary' | 'accounting_period_closing' | 'accounting_business_plan'
+  | 'accounting_tax_summary' | 'accounting_period_closing'
+  | 'accounting_business_plan'
   | 'business_analysis'
   | 'business_support_proposal'
   | 'ai_business_consultant'
@@ -102,7 +104,7 @@ export interface Job {
   readyToInvoice?: boolean;
   invoiceId?: string | null;
   manufacturingStatus?: ManufacturingStatus;
-  aiAnalysisReport?: string;
+  aiAnalysisReport?: string; // Added missing property
 }
 
 export interface JournalEntry {
@@ -316,7 +318,7 @@ export interface Lead {
     score?: number;
     aiAnalysisReport?: string;
     aiDraftProposal?: string;
-    aiInvestigation?: CompanyInvestigation | null;
+    aiInvestigation?: CompanyInvestigation | null; // Added missing property
 }
 
 export interface ApprovalRoute {
@@ -349,7 +351,7 @@ export interface ApplicationWithDetails extends Application {
     applicant?: User;
     applicationCode?: ApplicationCode;
     approvalRoute?: ApprovalRoute;
-    approvalHistory?: ApprovalHistory[];
+    approvalHistory?: ApprovalHistory[]; // Added missing property
 }
 
 export interface Employee {
@@ -572,10 +574,10 @@ export interface AnalysisProject {
 
 export interface AIArtifact {
   id: string;
-  project_id?: string;
+  project_id?: string; // Added missing property
   kind: ArtifactKind;
   title: string;
-  content_json?: any;
+  content_json?: any; // Added missing property
   source_url?: string;
   file_path?: string;
   metrics?: any;
@@ -586,7 +588,7 @@ export interface AIArtifact {
   storage_path?: string | null;
   status?: string;
   created_by?: string | null;
-  created_by_user?: Pick<User, 'name'>;
+  created_by_user?: Pick<User, 'name'>; // Added missing property
   createdAt?: string;
   updatedAt?: string;
 }

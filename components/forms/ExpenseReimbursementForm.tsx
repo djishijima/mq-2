@@ -96,7 +96,7 @@ const ExpenseReimbursementForm: React.FC<ExpenseReimbursementFormProps> = ({ onS
         setIsOcrLoading(true);
         setError('');
         
-        const filePromises = Array.from(files).map(async file => {
+        const filePromises = Array.from(files).map(async (file: File) => { // Explicitly type file as File
             try {
                 const [base64String, uploadResult] = await Promise.all([
                     readFileAsBase64(file),

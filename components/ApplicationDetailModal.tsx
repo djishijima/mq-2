@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ApplicationWithDetails, User, Customer, Job } from '../../types';
 import { X, CheckCircle, Send, Loader } from './Icons';
 import ApplicationStatusBadge from './ApplicationStatusBadge';
-import { getUsers } from '../../services/dataService';
+import { getUsers } from '../services/dataService';
 
 interface ApplicationDetailModalProps {
     application: ApplicationWithDetails | null;

@@ -228,9 +228,9 @@ CREATE TABLE IF NOT EXISTS public.customers (
     branch_name TEXT,
     account_no TEXT,
     sales_user_code TEXT,
-    start_date DATE,
-    end_date DATE,
-    drawing_date DATE,
+    startDate DATE,
+    endDate DATE,
+    drawingDate DATE,
     sales_goal TEXT,
     info_sales_ideas TEXT,
     customer_contact_info TEXT,
@@ -392,7 +392,7 @@ VALUES
 ('TRP', '交通費申請フォーム', '交通費申請用のフォーム', '{"fields":[{"name":"details","type":"array","label":"交通費明細","items":{"type":"object","properties":{"travelDate":{"type":"date","label":"利用日"},"departure":{"type":"text","label":"出発地"},"arrival":{"type":"text","label":"目的地"},"transportMode":{"type":"select","label":"交通手段","options":["電車","バス","タクシー","飛行機","その他"]},"amount":{"type":"number","label":"金額"}}}},{"name":"notes","type":"textarea","label":"備考"}]}', true),
 ('LEV', '休暇申請フォーム', '休暇申請用のフォーム', '{"fields":[{"name":"leaveType","type":"select","label":"休暇の種類","required":true,"options":["有給休暇","午前半休","午後半休","欠勤","その他"]},{"name":"startDate","type":"date","label":"開始日","required":true},{"name":"endDate","type":"date","label":"終了日","required":true},{"name":"reason","type":"textarea","label":"理由","required":true}]}', true),
 ('APL', '稟議申請フォーム', '稟議申請用のフォーム', '{"fields":[{"name":"title","type":"text","label":"件名","required":true},{"name":"details","type":"textarea","label":"目的・概要","required":true}]}', true),
-('DLY', '日報フォーム', '日報提出用のフォーム', '{"fields":[{"name":"reportDate","type":"date","label":"報告日","required":true},{"name":"startTime","type":"time","label":"業務開始"},{"name":"endTime","type":"time","label":"業務終了"},{"name":"customerName","type":"text","label":"訪問先・顧客名"},{"name":"activityContent":{"type":"textarea","label":"活動内容","required":true},"nextDayPlan":{"type":"textarea","label":"翌日予定"}}]}}', true),
+('DLY', '日報フォーム', '日報提出用のフォーム', '{"fields":[{"name":"reportDate","type":"date","label":"報告日","required":true},{"name":"startTime","type":"time","label":"業務開始"},{"name":"endTime","type":"time","label":"業務終了"},{"name":"customerName","type":"text","label":"訪問先・顧客名"},{"name":"activityContent","type":"textarea","label":"活動内容","required":true},{"name":"nextDayPlan","type":"textarea","label":"翌日予定"}]}', true),
 ('WKR', '週報フォーム', '週報提出用のフォーム', '{"fields":[{"name":"title","type":"text","label":"件名","required":true},{"name":"details","type":"textarea","label":"報告内容","required":true}]}', true)
 ON CONFLICT (code) DO UPDATE SET schema = EXCLUDED.schema, is_active = EXCLUDED.is_active;
 

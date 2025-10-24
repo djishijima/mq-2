@@ -231,6 +231,140 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onAddJ
                         </button>
                     </div>
                 </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 pt-0 space-y-6 flex-1 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={formRowClass}>
+                        <label htmlFor="clientName" className={labelClass}>クライアント名 <span className="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            id="clientName"
+                            name="clientName"
+                            ref={clientNameInputRef}
+                            value={formData.clientName}
+                            onChange={handleChange}
+                            className={getInputClass('clientName')}
+                            disabled={isAiLoading || isSubmitting}
+                        />
+                        {errors.clientName && <p className="text-red-500 text-xs mt-1">{errors.clientName}</p>}
+                    </div>
+                    <div className={formRowClass}>
+                        <label htmlFor="title" className={labelClass}>案件タイトル <span className="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            id="title"
+                            name="title"
+                            value={formData.title}
+                            onChange={handleChange}
+                            className={getInputClass('title')}
+                            disabled={isAiLoading || isSubmitting}
+                        />
+                        {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+                    </div>
+                    <div className={formRowClass}>
+                        <label htmlFor="dueDate" className={labelClass}>納期 <span className="text-red-500">*</span></label>
+                        <input
+                            type="date"
+                            id="dueDate"
+                            name="dueDate"
+                            value={formData.dueDate}
+                            onChange={handleChange}
+                            className={getInputClass('dueDate')}
+                            disabled={isAiLoading || isSubmitting}
+                        />
+                        {errors.dueDate && <p className="text-red-500 text-xs mt-1">{errors.dueDate}</p>}
+                    </div>
+                    <div className={formRowClass}>
+                        <label htmlFor="price" className={labelClass}>売上高 (P) <span className="text-red-500">*</span></label>
+                        <input
+                            type="number"
+                            id="price"
+                            name="price"
+                            value={formData.price}
+                            onChange={handleChange}
+                            className={getInputClass('price')}
+                            disabled={isAiLoading || isSubmitting}
+                        />
+                        {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
+                    </div>
+                    <div className={formRowClass}>
+                        <label htmlFor="variableCost" className={labelClass}>変動費 (V)</label>
+                        <input
+                            type="number"
+                            id="variableCost"
+                            name="variableCost"
+                            value={formData.variableCost}
+                            onChange={handleChange}
+                            className={getInputClass(undefined)}
+                            disabled={isAiLoading || isSubmitting}
+                        />
+                    </div>
+                    <div className={formRowClass}>
+                        <label htmlFor="margin" className={labelClass}>限界利益 (M)</label>
+                        <input
+                            type="text"
+                            id="margin"
+                            value={formatJPY(formData.price - formData.variableCost)}
+                            className={`${getInputClass(undefined)} !text-blue-600 !font-semibold`}
+                            disabled
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className={formRowClass}>
+                        <label htmlFor="quantity" className={labelClass}>数量</label>
+                        <input
+                            type="number"
+                            id="quantity"
+                            name="quantity"
+                            value={formData.quantity}
+                            onChange={handleChange}
+                            className={getInputClass(undefined)}
+                            disabled={isAiLoading || isSubmitting}
+                        />
+                    </div>
+                    <div className={formRowClass}>
+                        <label htmlFor="paperType" className={labelClass}>用紙種類</label>
+                        <select
+                            id="paperType"
+                            name="paperType"
+                            value={formData.paperType}
+                            onChange={handleChange}
+                            className={getInputClass(undefined)}
+                            disabled={isAiLoading || isSubmitting}
+                        >
+                            {PAPER_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                        </select>
+                    </div>
+                    <div className={formRowClass}>
+                        <label htmlFor="finishing" className={labelClass}>加工</label>
+                        <select
+                            id="finishing"
+                            name="finishing"
+                            value={formData.finishing}
+                            onChange={handleChange}
+                            className={getInputClass(undefined)}
+                            disabled={isAiLoading || isSubmitting}
+                        >
+                            {FINISHING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                    </div>
+                </div>
+
+                <div className={formRowClass}>
+                    <label htmlFor="details" className={labelClass}>詳細</label>
+                    <textarea
+                        id="details"
+                        name="details"
+                        value={formData.details}
+                        onChange={handleChange}
+                        rows={5}
+                        className={getInputClass(undefined)}
+                        disabled={isAiLoading || isSubmitting}
+                    />
+                </div>
             </form>
         </div>
 

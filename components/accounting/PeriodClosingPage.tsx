@@ -48,7 +48,7 @@ const PeriodClosingPage: React.FC<PeriodClosingPageProps> = ({ addToast, jobs, a
         items.push({
             id: 'uninvoiced_jobs',
             description: '請求書が未発行の完了案件',
-            count: uninvoicedJobs.length,
+            count: uninvoicedJobs.length > 0 ? 1 : 0,
             status: uninvoicedJobs.length > 0 ? 'needs_review' : 'ok',
             actionPage: 'sales_billing'
         });
@@ -201,3 +201,31 @@ const PeriodClosingPage: React.FC<PeriodClosingPageProps> = ({ addToast, jobs, a
             <div className="p-6 border-b border-slate-200 dark:border-slate-700">
                 <h2 className="text-xl font-semibold text-slate-800 dark:text-white">AI 月次決算サマリー</h2>
             </div>
+            <div className="p-6">
+                {isMonthlyClosing ? (
+                    <div className="flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
+                        <Loader className="w-5 h-5 animate-spin" />
+                        <span>AIが決算サマリーを生成しています...</span>
+                    </div>
+                ): closingSummary ? (
+                    <div className="space-y-3">
+                        <p className="text-sm text-slate-600 dark:text-slate-300">
+                            AIが生成した月次決算サマリーです。必要に応じて関係者と共有してください。
+                        </p>
+                        <pre className="bg-slate-100 dark:bg-slate-900/60 text-sm leading-relaxed text-slate-700 dark:text-slate-200 p-4 rounded-lg whitespace-pre-wrap break-words">
+                            {closingSummary}
+                        </pre>
+                    </div>
+                ):(
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        まだ決算サマリーは生成されていません。上部の「月次締を実行してAIサマリーを生成」ボタンから締処理を実行してください。
+                    </p>
+                )}
+            </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PeriodClosingPage;
