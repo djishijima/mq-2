@@ -176,10 +176,11 @@ JSONのフォーマットは以下のようにしてください:
         await logUserActivity(userId, 'ai_company_analysis_start', { customerId: customer.id, customerName: customer.customerName });
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-pro", // Changed to Pro for more complex analysis
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
+                thinkingConfig: { thinkingBudget: 32768 }, // Added thinking config
             },
         });
         
@@ -266,7 +267,7 @@ export const enrichCustomerData = async (customerName: string, userId: string): 
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
-                tools: [{ googleSearch: {} }],
+                tools: [{ googleSearch: {} }], // Added googleSearch
             },
         });
         
@@ -618,10 +619,11 @@ ${context}
         await logUserActivity(userId, 'ai_proposal_section_start', { customerId: customer.id, sectionTitle, job: job?.id, estimate: estimate?.id });
 
         const response = await ai.models.generateContent({ 
-            model, 
+            model: "gemini-2.5-pro", // Changed to Pro for more complex proposal sections
             contents: prompt, 
             config: { 
                 tools: [{ googleSearch: {} }],
+                thinkingConfig: { thinkingBudget: 32768 }, // Added thinking config
             },
         });
         const result = response.text;
@@ -706,9 +708,11 @@ export const generateClosingSummary = async (type: '月次' | '年次', currentJ
     await logUserActivity(userId, 'ai_closing_summary_start', { type, jobCount: currentJobs.length });
 
     const response = await ai.models.generateContent({
-        model,
+        model: "gemini-2.5-pro", // Changed to Pro for more complex financial summaries
         contents: prompt,
-        config: {},
+        config: {
+            thinkingConfig: { thinkingBudget: 32768 }, // Added thinking config
+        },
     });
     const result = response.text;
     // FIX: Pass userId to logUserActivity
@@ -1005,6 +1009,7 @@ export const processUnstructuredData = async (text: string, userName: string, fi
                         { name: "add_job", parameters: { type: Type.OBJECT, properties: { clientName: { type: Type.STRING }, title: { type: Type.STRING }, quantity: { type: Type.NUMBER }, paperType: { type: Type.STRING }, finishing: { type: Type.STRING }, details: { type: Type.STRING }, dueDate: { type: Type.STRING }, price: { type: Type.NUMBER }, variableCost: { type: Type.NUMBER } }, required: ["clientName", "title", "quantity", "paperType", "finishing", "details", "dueDate", "price", "variableCost"] } },
                     ],
                 }],
+                thinkingConfig: { thinkingBudget: 32768 }, // Added thinking config
             },
         });
         // FIX: Pass userId to logUserActivity
@@ -1025,7 +1030,7 @@ export const analyzeImage = async (base64: string, mimeType: string, prompt: str
             model: 'gemini-2.5-flash',
             contents: { parts: [imagePart, textPart] },
             config: {
-                thinkingConfig: { thinkingBudget: 100 },
+                thinkingConfig: { thinkingBudget: 100 }, // For Flash model, a smaller budget is appropriate if no maxOutputTokens
             },
         });
         const result = response.text;
@@ -1145,7 +1150,7 @@ export const transcribeAudio = async (audioBlob: Blob, userId: string): Promise<
                 ],
             },
             config: {
-                thinkingConfig: { thinkingBudget: 100 },
+                thinkingConfig: { thinkingBudget: 100 }, // For Flash model, a smaller budget is appropriate
             },
         });
 
@@ -1188,7 +1193,7 @@ export const analyzeVideo = async (videoFile: File, prompt: string, userId: stri
                 ],
             },
             config: {
-                thinkingConfig: { thinkingBudget: 100 },
+                thinkingConfig: { thinkingBudget: 32768 }, // Added thinking config
             },
         });
 
@@ -1281,7 +1286,7 @@ export const transcribeVideoWithTimestamps = async (videoFile: File, prompt: str
                 ],
             },
             config: {
-                thinkingConfig: { thinkingBudget: 100 },
+                thinkingConfig: { thinkingBudget: 32768 }, // Added thinking config
             },
         });
 
@@ -1359,7 +1364,7 @@ export const analyzeDocumentContent = async (prompt: string, userId: string): Pr
             model: 'gemini-2.5-pro',
             contents: prompt,
             config: {
-                thinkingConfig: { thinkingBudget: 100 },
+                thinkingConfig: { thinkingBudget: 32768 }, // Added thinking config
             },
         });
         const result = response.text;

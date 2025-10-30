@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ApprovalRoute } from '../../types';
-import { getApprovalRoutes } from '../../services/dataService';
+import { getApprovalRoutes } from '../../services/dataService'; // FIX: getApprovalRoutesをインポート
+import { ApprovalRoute } from '../../types'; // FIX: ApprovalRoute型をインポート
 
 interface ApprovalRouteSelectorProps {
     onChange: (routeId: string) => void;
@@ -18,7 +18,7 @@ const ApprovalRouteSelector: React.FC<ApprovalRouteSelectorProps> = ({ onChange,
         let isMounted = true;
         const fetchRoutes = async () => {
             try {
-                const fetchedRoutes = await getApprovalRoutes();
+                const fetchedRoutes = await getApprovalRoutes(); // FIX: getApprovalRoutesを使用
                 if (isMounted) {
                     setRoutes(fetchedRoutes);
                     

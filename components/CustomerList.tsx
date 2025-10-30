@@ -1,10 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Customer, SortConfig, Toast, EmployeeUser } from '../types';
-import { Pencil, Eye, Mail, Lightbulb, Users, PlusCircle, Loader, Save, X, Search } from './Icons';
+// FIX: Linkコンポーネントをインポートし、DropdownMenu, DropdownMenuItemコンポーネントを名前付きインポートに修正
+import { Pencil, Eye, Mail, Lightbulb, Users, PlusCircle, Loader, Save, X, Search, Link } from './Icons';
 import EmptyState from './ui/EmptyState';
 import SortableHeader from './ui/SortableHeader';
 import { generateSalesEmail, enrichCustomerData } from '../services/geminiService';
 import { createSignature } from '../utils';
+// FIX: DropdownMenu, DropdownMenuItemコンポーネントを名前付きインポートに修正
+import { DropdownMenu, DropdownMenuItem } from './ui/DropdownMenu';
+
 
 interface CustomerListProps {
   customers: Customer[];

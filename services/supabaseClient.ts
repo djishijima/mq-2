@@ -30,7 +30,7 @@ export const getSupabase = (): SupabaseClient => {
     }
     if (!supabase) {
         // エラーメッセージを更新
-        throw new Error("Supabase client is not initialized. Please configure credentials in supabaseCredentials.ts and ensure they are valid."); // FIX: Updated error message
+        throw new Error("Supabaseクライアントが初期化されていません。supabaseCredentials.tsファイルで認証情報が正しく設定され、有効であることを確認してください。"); // FIX: Updated error message
     }
     return supabase;
 };

@@ -97,7 +97,7 @@ SELECT
     e.department,
     e.title,
     u.email, -- auth.users から email を取得
-    COALESCE(pu.role, 'user') AS role, -- public.users からロールを取得
+    COALESCE(pu.role, 'user') AS role, -- public.users テーブルからロールを取得
     e.created_at
 FROM
     public.employees e
@@ -207,7 +207,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
     info_history TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     post_no TEXT,
-    address2 TEXT,
+    address_2 TEXT,
     fax TEXT,
     closing_day TEXT,
     monthly_plan TEXT,
@@ -318,8 +318,8 @@ CREATE TABLE IF NOT EXISTS public.estimates (
   status text DEFAULT 'draft',
   body_md text,
   created_by uuid,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
 
 -- 2. カラム補完とトリガー設定
@@ -447,6 +447,7 @@ DROP POLICY IF EXISTS estimates_all_auth ON public.estimates;
 -- 権限付与
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT ON public.v_employees_active TO anon, authenticated; -- Modified to use v_employees_active
+
 
 -- 参照用テーブルにSELECT権限を付与
 CREATE POLICY "Allow authenticated read access" ON public.forms FOR SELECT TO authenticated USING (true);

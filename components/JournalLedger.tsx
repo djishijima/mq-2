@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { JournalEntry, SortConfig, EmployeeUser } from '../types';
-import { PlusCircle, Sparkles, Loader, BookOpen } from '../Icons'; // FIX: Iconsからインポート
+// FIX: Iconsからインポート
+import { PlusCircle, Sparkles, Loader, BookOpen } from './Icons';
 import { suggestJournalEntry } from '../../services/geminiService';
 import EmptyState from '../ui/EmptyState';
 import SortableHeader from '../ui/SortableHeader';

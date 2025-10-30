@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './src/App'; // FIX: Corrected import path for App component
+// FIX: Corrected import path for App component
+import { App } from './src/App';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

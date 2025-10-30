@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CustomerList } from './components/CustomerList';
+import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import JobList from './components/JobList';
 import CreateJobModal from './components/CreateJobModal';
 import JobDetailModal from './components/JobDetailModal';
+import CustomerList from './components/CustomerList';
 import CustomerDetailModal from './components/CustomerDetailModal';
 import { CompanyAnalysisModal } from './components/CompanyAnalysisModal';
 import LeadManagementPage from './components/sales/LeadManagementPage';
@@ -53,6 +54,8 @@ import PeriodClosingPage from './components/accounting/PeriodClosingPage';
 import AnalysisProjectsPage from './components/accounting/AnalysisProjectsPage';
 import ProjectDetailPage from './components/accounting/ProjectDetailPage';
 import AnalysisSimulationPage from './components/accounting/AnalysisSimulationPage';
+// FIX: Added missing import for BillingManagement
+import BillingManagement from './components/accounting/BillingManagement';
 
 
 import * as dataService from './services/dataService';
@@ -608,174 +611,56 @@ export const App: React.FC = () => {
             addToast('在庫品目を更新しました。', 'success');
             await dataService.logUserActivity(currentUser.id, 'inventory_item_updated', { itemId, updates: itemData });
             await fetchAllData();
-            setIsCreateInventoryItemModalOpen(false);
+            setIsCreateInventoryItemModalOpen(false); // Close modal after saving
+            setSelectedInventoryItem(null); // Clear selected item
         } catch (error: any) {
             addToast(`在庫品目の更新に失敗しました: ${error.message}`, 'error');
         }
     }, [addToast, fetchAllData, currentUser]);
 
-    const handleMarkPaid = useCallback(async (invoice: Invoice) => {
+    const handleMarkInvoicePaid = useCallback(async (invoice: Invoice) => {
         if (!currentUser) {
             addToast('ユーザー情報が見つかりません。', 'error');
             return;
         }
         try {
-            await dataService.updateInvoice(invoice.id, { status: 'paid', paidAt: new Date().toISOString() });
-            addToast(`請求書 ${invoice.invoiceNo} を入金済みにしました。`, 'success');
-            await dataService.logUserActivity(currentUser.id, 'invoice_marked_paid', { invoiceId: invoice.id, invoiceNo: invoice.invoiceNo });
+            await dataService.updateInvoice(invoice.id, { status: InvoiceStatus.Paid, paidAt: new Date().toISOString() });
+            addToast('請求書を入金済みにしました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'invoice_paid', { invoiceId: invoice.id });
             await fetchAllData();
         } catch (error: any) {
             addToast(`請求書の更新に失敗しました: ${error.message}`, 'error');
         }
     }, [addToast, fetchAllData, currentUser]);
 
-    const handleSaveAccountItem = useCallback(async (item: Partial<AccountItem>) => {
+    const handleAddBugReport = useCallback(async (report: Omit<BugReport, 'id' | 'created_at' | 'status' | 'reporter_name'>) => {
         if (!currentUser) {
             addToast('ユーザー情報が見つかりません。', 'error');
             return;
         }
         try {
-            await dataService.saveAccountItem(item);
-            addToast('勘定科目を保存しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'account_item_saved', { name: item.name });
+            await dataService.addBugReport({ ...report, reporterName: currentUser.name });
+            addToast('ご報告ありがとうございます！', 'success');
+            await dataService.logUserActivity(currentUser.id, 'bug_report_added', { summary: report.summary, type: report.reportType });
             await fetchAllData();
+            setIsBugReportChatModalOpen(false);
         } catch (error: any) {
-            addToast(`勘定科目の保存に失敗しました: ${error.message}`, 'error');
+            addToast(`報告の送信に失敗しました: ${error.message}`, 'error');
         }
     }, [addToast, fetchAllData, currentUser]);
 
-    const handleDeleteAccountItem = useCallback(async (id: string) => {
+    const handleUpdateBugReport = useCallback(async (id: string, updates: Partial<BugReport>) => {
         if (!currentUser) {
             addToast('ユーザー情報が見つかりません。', 'error');
             return;
         }
         try {
-            await dataService.deactivateAccountItem(id); // Deactivate instead of hard delete
-            addToast('勘定科目を無効化しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'account_item_deactivated', { id });
+            await dataService.updateBugReport(id, updates);
+            addToast('報告を更新しました。', 'success');
+            await dataService.logUserActivity(currentUser.id, 'bug_report_updated', { reportId: id, updates });
             await fetchAllData();
         } catch (error: any) {
-            addToast(`勘定科目の無効化に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    const handleSavePaymentRecipient = useCallback(async (item: Partial<PaymentRecipient>) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.savePaymentRecipient(item);
-            addToast('支払先を保存しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'payment_recipient_saved', { name: item.companyName || item.recipientName });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`支払先の保存に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    const handleDeletePaymentRecipient = useCallback(async (id: string) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.deletePaymentRecipient(id);
-            addToast('支払先を削除しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'payment_recipient_deleted', { id });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`支払先の削除に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    const handleSaveAllocationDivision = useCallback(async (item: Partial<AllocationDivision>) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.saveAllocationDivision(item);
-            addToast('振分区分を保存しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'allocation_division_saved', { name: item.name });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`振分区分の保存に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    const handleDeleteAllocationDivision = useCallback(async (id: string) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.deleteAllocationDivision(id);
-            addToast('振分区分を削除しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'allocation_division_deleted', { id });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`振分区分の削除に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    const handleSaveDepartment = useCallback(async (item: Partial<Department>) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.saveDepartment(item);
-            addToast('部署を保存しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'department_saved', { name: item.name });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`部署の保存に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    const handleDeleteDepartment = useCallback(async (id: string) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.deleteDepartment(id);
-            addToast('部署を削除しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'department_deleted', { id });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`部署の削除に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    const handleSaveTitle = useCallback(async (item: Partial<Title>) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.saveTitle(item);
-            addToast('役職を保存しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'title_saved', { name: item.name });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`役職の保存に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    const handleDeleteTitle = useCallback(async (id: string) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.deleteTitle(id);
-            addToast('役職を削除しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'title_deleted', { id });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`役職の削除に失敗しました: ${error.message}`, 'error');
+            addToast(`報告の更新に失敗しました: ${error.message}`, 'error');
         }
     }, [addToast, fetchAllData, currentUser]);
 
@@ -785,7 +670,7 @@ export const App: React.FC = () => {
             return;
         }
         try {
-            await dataService.addEstimate(estimateData);
+            await dataService.addEstimate({ ...estimateData, createdBy: currentUser.id });
             addToast('見積を保存しました。', 'success');
             await dataService.logUserActivity(currentUser.id, 'estimate_added', { title: estimateData.title, customerName: estimateData.customerName });
             await fetchAllData();
@@ -800,194 +685,213 @@ export const App: React.FC = () => {
             return;
         }
         try {
-            await dataService.updateEstimate(id, estimateData);
+            await dataService.updateEstimate(id, { ...estimateData, createdBy: currentUser.id });
             addToast('見積を更新しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'estimate_updated', { estimateId: id, updates: estimateData });
+            await dataService.logUserActivity(currentUser.id, 'estimate_updated', { id, title: estimateData.title, customerName: estimateData.customerName });
             await fetchAllData();
         } catch (error: any) {
             addToast(`見積の更新に失敗しました: ${error.message}`, 'error');
         }
     }, [addToast, fetchAllData, currentUser]);
 
-    const handleUpdateBugReport = useCallback(async (id: string, updates: Partial<BugReport>) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.updateBugReport(id, updates);
-            addToast('報告を更新しました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'bug_report_updated', { bugReportId: id, updates });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`報告の更新に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    const handleAddBugReport = useCallback(async (report: Omit<BugReport, 'id' | 'created_at' | 'status' | 'reporter_name'>) => {
-        if (!currentUser) {
-            addToast('ユーザー情報が見つかりません。', 'error');
-            return;
-        }
-        try {
-            await dataService.addBugReport({ ...report, reporterName: currentUser.name, status: '未対応' });
-            addToast('バグ報告・改善要望を受け付けました。', 'success');
-            await dataService.logUserActivity(currentUser.id, 'bug_report_added', { summary: report.summary, type: report.reportType });
-            await fetchAllData();
-        } catch (error: any) {
-            addToast(`報告の送信に失敗しました: ${error.message}`, 'error');
-        }
-    }, [addToast, fetchAllData, currentUser]);
-
-    // Handle offline/Supabase connection issues
-    if (!isSupabaseConnected && !isDemoMode && connectionError) {
-        // FIX: Replaced ConnectionSetupPage with DatabaseSetupInstructionsModal
-        return <DatabaseSetupInstructionsModal onRetry={fetchAllData} />;
-    }
-    if (showDatabaseSetupInstructions) {
-        return <DatabaseSetupInstructionsModal onRetry={fetchAllData} />;
-    }
-    if (!currentUser && (isSupabaseConnected || isDemoMode)) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-[#0d1117] text-slate-800 dark:text-white">
-                <Loader className="w-12 h-12 animate-spin text-blue-600" />
-                <p className="ml-4 text-xl">ユーザーデータを読み込み中...</p>
-            </div>
-        );
-    }
-    
-    return (
-        <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white">
-            <Sidebar 
-                currentPage={currentPage} 
-                onNavigate={handleNavigate} 
-                currentUser={currentUser}
-                allUsers={allUsers}
-                onUserChange={setCurrentUser}
-            />
-            <main className="flex-1 p-8 overflow-y-auto">
-                <Header 
-                    title={pageTitle} 
-                    primaryAction={primaryAction} 
-                    search={['sales_leads', 'sales_customers', 'sales_orders', 'admin_bug_reports', 'sales_estimates', 'ai_artifacts'].includes(currentPage) ? {
-                        value: searchTerm,
-                        onChange: setSearchTerm,
-                        placeholder: `${pageTitle}を検索...`
-                    } : undefined}
+    // Conditional rendering for content based on page state
+    const renderContent = () => {
+        if (showDatabaseSetupInstructions) {
+            return (
+                <DatabaseSetupInstructionsModal
+                    onRetry={() => {
+                        setShowDatabaseSetupInstructions(false);
+                        setIsSupabaseConnected(hasSupabaseCredentials()); // Re-check credentials
+                        if (hasSupabaseCredentials()) fetchAllData(); // Try fetching data again
+                    }}
                 />
+            );
+        }
+
+        if (!isSupabaseConnected) {
+            return (
+                <div className="flex flex-col items-center justify-center min-h-screen-minus-header">
+                    <Loader className="w-16 h-16 animate-spin text-blue-500" />
+                    <p className="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">データベースに接続中...</p>
+                    <p className="mt-2 text-base text-slate-500 dark:text-slate-400">認証情報を確認しています。</p>
+                </div>
+            );
+        }
+
+        if (connectionError && !isDemoMode) {
+            return (
+                <div className="p-8">
+                    <div className="bg-red-100 dark:bg-red-900/50 p-4 rounded-lg flex items-center gap-4">
+                        <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                        <div>
+                            <h2 className="font-bold text-red-800 dark:text-red-200">接続エラー: {connectionError}</h2>
+                            <p className="text-sm text-red-700 dark:text-red-300">
+                                SupabaseのURLやAnon Keyが正しく設定されているか、またはデータベースが稼働しているかを確認してください。
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mt-6 flex justify-center">
+                        <button onClick={() => setShowDatabaseSetupInstructions(true)} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg">
+                            <Settings className="w-5 h-5" />
+                            設定ガイドを開く
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        switch (currentPage) {
+            case 'analysis_dashboard':
+                return <Dashboard jobs={jobs} journalEntries={journalEntries} accountItems={accountItems} pendingApprovalCount={applications.filter(app => app.approverId === currentUser?.id && app.status === 'pending_approval').length} onNavigateToApprovals={() => handleNavigate('approval_list')} isAIOff={isAIOff} />;
+            case 'sales_leads':
+                return <LeadManagementPage leads={leads} searchTerm={searchTerm} onRefresh={fetchAllData} onUpdateLead={handleUpdateLead} onDeleteLead={handleDeleteLead} addToast={addToast} requestConfirmation={requestConfirmation} currentUser={currentUser} isAIOff={isAIOff} onAddEstimate={handleAddEstimate} />;
+            case 'sales_customers':
+                return <CustomerList customers={customers} searchTerm={searchTerm} onSelectCustomer={(c) => { setSelectedCustomer(c); setCustomerDetailMode('view'); setIsCustomerDetailModalOpen(true); }} onUpdateCustomer={handleUpdateCustomer} onAnalyzeCustomer={handleAnalyzeCustomer} addToast={addToast} currentUser={currentUser} onNewCustomer={() => { setSelectedCustomer(null); setCustomerDetailMode('new'); setIsCustomerDetailModalOpen(true); }} isAIOff={isAIOff} />;
+            case 'sales_pipeline':
+                return <SalesPipelinePage jobs={jobs} onUpdateJob={handleUpdateJob} onCardClick={(j) => { setSelectedJob(j); setIsJobDetailModalOpen(true); }} />;
+            case 'sales_estimates':
+                return <EstimateManagementPage estimates={estimates} customers={customers} allUsers={allUsers} onAddEstimate={handleAddEstimate} onUpdateEstimate={handleUpdateEstimate} addToast={addToast} currentUser={currentUser} searchTerm={searchTerm} isAIOff={isAIOff} />;
+            case 'sales_orders':
+                return <JobList jobs={jobs} searchTerm={searchTerm} onSelectJob={(job) => { setSelectedJob(job); setIsJobDetailModalOpen(true); }} onNewJob={() => setIsCreateJobModalOpen(true)} />;
+            case 'sales_billing':
+                return <BillingManagement jobs={jobs} onRefreshData={fetchAllData} onMarkPaid={handleMarkInvoicePaid} />;
+            case 'analysis_ranking':
+                return <SalesRanking jobs={jobs} />;
+            case 'purchasing_orders':
+                return <PurchasingManagementPage purchaseOrders={purchaseOrders} />;
+            case 'purchasing_invoices':
+                return <AccountingPage page={currentPage} jobs={jobs} journalEntries={journalEntries} accountItems={accountItems} onAddEntry={handleAddEntry} addToast={addToast} requestConfirmation={requestConfirmation} currentUser={currentUser} isAIOff={isAIOff} />;
+            case 'purchasing_payments':
+                return <AccountingPage page={currentPage} jobs={jobs} journalEntries={journalEntries} accountItems={accountItems} onAddEntry={handleAddEntry} addToast={addToast} requestConfirmation={requestConfirmation} currentUser={currentUser} isAIOff={isAIOff} />;
+            case 'inventory_management':
+                return <InventoryManagementPage inventoryItems={inventoryItems} onSelectItem={(item) => { setSelectedInventoryItem(item); setIsCreateInventoryItemModalOpen(true); }} />;
+            case 'manufacturing_orders':
+                return <ManufacturingOrdersPage jobs={jobs} onSelectJob={(job) => { setSelectedJob(job); setIsJobDetailModalOpen(true); }} />;
+            case 'manufacturing_progress':
+                return <ManufacturingPipelinePage jobs={jobs} onUpdateJob={handleUpdateJob} onCardClick={(j) => { setSelectedJob(j); setIsJobDetailModalOpen(true); }} />;
+            case 'manufacturing_cost':
+                return <ManufacturingCostManagement jobs={jobs} />;
+            case 'hr_attendance':
+                return <PlaceholderPage title="勤怠" />;
+            case 'hr_man_hours':
+                return <PlaceholderPage title="工数" />;
+            case 'hr_labor_cost':
+                return <AccountingPage page={currentPage} employees={employees} />;
+            case 'approval_list':
+                return <ApprovalWorkflowPage currentUser={currentUser} view='list' addToast={addToast} customers={customers} jobs={jobs} accountItems={accountItems} purchaseOrders={purchaseOrders} departments={departments} isAIOff={isAIOff} allocationDivisions={allocationDivisions} applications={applications} onRefresh={fetchAllData} />;
+            case 'approval_form_expense':
+                return <ApprovalWorkflowPage currentUser={currentUser} view='form' formCode='EXP' addToast={addToast} customers={customers} jobs={jobs} accountItems={accountItems} purchaseOrders={purchaseOrders} departments={departments} isAIOff={isAIOff} allocationDivisions={allocationDivisions} applications={applications} onRefresh={fetchAllData} />;
+            case 'approval_form_transport':
+                return <ApprovalWorkflowPage currentUser={currentUser} view='form' formCode='TRP' addToast={addToast} customers={customers} jobs={jobs} accountItems={accountItems} purchaseOrders={purchaseOrders} departments={departments} isAIOff={isAIOff} allocationDivisions={allocationDivisions} applications={applications} onRefresh={fetchAllData} />;
+            case 'approval_form_leave':
+                return <ApprovalWorkflowPage currentUser={currentUser} view='form' formCode='LEV' addToast={addToast} customers={customers} jobs={jobs} accountItems={accountItems} purchaseOrders={purchaseOrders} departments={departments} isAIOff={isAIOff} allocationDivisions={allocationDivisions} applications={applications} onRefresh={fetchAllData} />;
+            case 'approval_form_approval':
+                return <ApprovalWorkflowPage currentUser={currentUser} view='form' formCode='APL' addToast={addToast} customers={customers} jobs={jobs} accountItems={accountItems} purchaseOrders={purchaseOrders} departments={departments} isAIOff={isAIOff} allocationDivisions={allocationDivisions} applications={applications} onRefresh={fetchAllData} />;
+            case 'approval_form_daily':
+                return <ApprovalWorkflowPage currentUser={currentUser} view='form' formCode='DLY' addToast={addToast} customers={customers} jobs={jobs} accountItems={accountItems} purchaseOrders={purchaseOrders} departments={departments} isAIOff={isAIOff} allocationDivisions={allocationDivisions} applications={applications} onRefresh={fetchAllData} />;
+            case 'approval_form_weekly':
+                return <ApprovalWorkflowPage currentUser={currentUser} view='form' formCode='WKR' addToast={addToast} customers={customers} jobs={jobs} accountItems={accountItems} purchaseOrders={purchaseOrders} departments={departments} isAIOff={isAIOff} allocationDivisions={allocationDivisions} applications={applications} onRefresh={fetchAllData} />;
+            case 'accounting_journal':
+                return <AccountingPage page={currentPage} journalEntries={journalEntries} onAddEntry={handleAddEntry} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'accounting_general_ledger':
+                return <AccountingPage page={currentPage} journalEntries={journalEntries} accountItems={accountItems} />;
+            case 'accounting_trial_balance':
+                return <AccountingPage page={currentPage} journalEntries={journalEntries} />;
+            case 'accounting_tax_summary':
+                return <PlaceholderPage title="消費税集計" />;
+            case 'accounting_period_closing':
+                return <PeriodClosingPage addToast={addToast} jobs={jobs} applications={applications} journalEntries={journalEntries} onNavigate={handleNavigate} currentUser={currentUser} />;
+            case 'accounting_business_plan':
+                return <BusinessPlanPage allUsers={allUsers} />;
+            case 'business_analysis':
+                return <BusinessAnalysisPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'business_support_proposal':
+                return <BusinessSupportPage customers={customers} jobs={jobs} estimates={estimates} currentUser={currentUser} addToast={addToast} isAIOff={isAIOff} />;
+            case 'ai_business_consultant':
+                return <AIChatPage currentUser={currentUser} jobs={jobs} customers={customers} journalEntries={journalEntries} />;
+            case 'ai_market_research':
+                return <MarketResearchPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'ai_artifacts':
+                return <AIArtifactsPage artifacts={aiArtifacts} allUsers={allUsers} searchTerm={searchTerm} />;
+            case 'ai_data_entry':
+                return <AIDataEntryPage customers={customers} onAddLead={handleAddLead} onUpdateCustomer={handleUpdateCustomer} onAddJob={handleAddJob} addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'ai_image_studio':
+                return <AIImageStudioPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'ai_image_generation':
+                return <AIImageGenerationPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'ai_tts':
+                return <AITextToSpeechPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'ai_audio_transcription':
+                return <AIAudioTranscriptionPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'ai_video_analysis':
+                return <AIVideoAnalysisPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'ai_video_generation':
+                return <AIVideoGenerationPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'ai_video_transcription':
+                return <AIVideoTranscriptionPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'ai_copywriting':
+                return <AICopywritingPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />;
+            case 'admin_audit_log':
+                return <AuditLogPage logs={userActivityLogs} />;
+            case 'admin_journal_queue':
+                return <JournalQueuePage />;
+            case 'admin_user_management':
+                return <UserManagementPage addToast={addToast} requestConfirmation={requestConfirmation} />;
+            case 'admin_route_management':
+                return <ApprovalRouteManagementPage addToast={addToast} requestConfirmation={requestConfirmation} />;
+            case 'admin_master_management':
+                return <MasterManagementPage addToast={addToast} requestConfirmation={requestConfirmation} accountItems={accountItems} paymentRecipients={paymentRecipients} allocationDivisions={allocationDivisions} departments={departments} titles={employeeTitles} onSaveAccountItem={dataService.saveAccountItem} onDeleteAccountItem={dataService.deactivateAccountItem} onSavePaymentRecipient={dataService.savePaymentRecipient} onDeletePaymentRecipient={dataService.deletePaymentRecipient} onSaveAllocationDivision={dataService.saveAllocationDivision} onDeleteAllocationDivision={dataService.deleteAllocationDivision} onSaveDepartment={dataService.saveDepartment} onDeleteDepartment={dataService.deleteDepartment} onSaveTitle={dataService.saveTitle} onDeleteTitle={dataService.deleteTitle} />;
+            case 'admin_bug_reports':
+                return <BugReportList reports={bugReports} onUpdateReport={handleUpdateBugReport} searchTerm={searchTerm} />;
+            case 'settings':
+                return <SettingsPage addToast={addToast} />;
+            case 'accounting_analysis_projects':
+                return <AnalysisProjectsPage projects={analysisProjects} onRefresh={fetchAllData} currentUser={currentUser} addToast={addToast} isAIOff={isAIOff} />;
+            case 'accounting_project_detail':
+                // This page requires a project ID, which isn't directly available from currentPage.
+                // Assuming navigation to this page sets a selectedProjectId in state or via URL params.
+                // For now, we'll render a placeholder or handle gracefully.
+                return <PlaceholderPage title="プロジェクト詳細" />;
+            case 'accounting_analysis_simulation':
+                return <AnalysisSimulationPage documents={documents} scenarios={bankScenarios} simulations={bankSimulations} onRefresh={fetchAllData} currentUser={currentUser} addToast={addToast} isAIOff={isAIOff} />;
+            default:
+                return <PlaceholderPage title={pageTitle} />;
+        }
+    };
+
+    return (
+        <div className="flex h-screen bg-slate-100 dark:bg-gray-900 text-slate-800 dark:text-slate-200">
+            <Sidebar currentPage={currentPage} onNavigate={handleNavigate} currentUser={currentUser} allUsers={allUsers} onUserChange={setCurrentUser} />
+            <main className="flex-1 overflow-y-auto p-8">
+                <Header title={pageTitle} primaryAction={primaryAction} search={{ value: searchTerm, onChange: setSearchTerm, placeholder: `${pageTitle}を検索...` }} />
                 <div className="mt-8">
-                    {currentPage === 'analysis_dashboard' && <Dashboard jobs={jobs} journalEntries={journalEntries} accountItems={accountItems} pendingApprovalCount={applications.filter(app => app.approverId === currentUser?.id && app.status === 'pending_approval').length} onNavigateToApprovals={() => handleNavigate('approval_list')} isAIOff={isAIOff} />}
-                    {currentPage === 'sales_orders' && <JobList jobs={jobs} searchTerm={searchTerm} onSelectJob={(job) => { setSelectedJob(job); setIsJobDetailModalOpen(true); }} onNewJob={() => setIsCreateJobModalOpen(true)} />}
-                    {currentPage === 'sales_customers' && <CustomerList customers={customers} searchTerm={searchTerm} onSelectCustomer={(customer) => { setSelectedCustomer(customer); setCustomerDetailMode('view'); setIsCustomerDetailModalOpen(true); }} onUpdateCustomer={handleUpdateCustomer} onAnalyzeCustomer={handleAnalyzeCustomer} addToast={addToast} currentUser={currentUser} onNewCustomer={() => { setSelectedCustomer(null); setCustomerDetailMode('new'); setIsCustomerDetailModalOpen(true); }} isAIOff={isAIOff} />}
-                    {currentPage === 'sales_leads' && <LeadManagementPage leads={leads} searchTerm={searchTerm} onRefresh={fetchAllData} onUpdateLead={handleUpdateLead} onDeleteLead={handleDeleteLead} addToast={addToast} requestConfirmation={requestConfirmation} currentUser={currentUser} isAIOff={isAIOff} onAddEstimate={handleAddEstimate} />}
-                    {currentPage === 'sales_pipeline' && <SalesPipelinePage jobs={jobs} onUpdateJob={handleUpdateJob} onCardClick={(job) => { setSelectedJob(job); setIsJobDetailModalOpen(true); }} />}
-                    {currentPage === 'purchasing_orders' && <PurchasingManagementPage purchaseOrders={purchaseOrders} />}
-                    {currentPage === 'inventory_management' && <InventoryManagementPage inventoryItems={inventoryItems} onSelectItem={(item) => { setSelectedInventoryItem(item); setIsCreateInventoryItemModalOpen(true); }} />}
-                    {currentPage === 'manufacturing_orders' && <ManufacturingOrdersPage jobs={jobs} onSelectJob={(job) => { setSelectedJob(job); setIsJobDetailModalOpen(true); }} />}
-                    {currentPage === 'manufacturing_progress' && <ManufacturingPipelinePage jobs={jobs} onUpdateJob={handleUpdateJob} onCardClick={(job) => { setSelectedJob(job); setIsJobDetailModalOpen(true); }} />}
-                    {currentPage === 'manufacturing_cost' && <ManufacturingCostManagement jobs={jobs} />}
-                    {currentPage === 'sales_estimates' && <EstimateManagementPage estimates={estimates} customers={customers} allUsers={allUsers} onAddEstimate={handleAddEstimate} onUpdateEstimate={handleUpdateEstimate} addToast={addToast} currentUser={currentUser} searchTerm={searchTerm} isAIOff={isAIOff} />}
-                    {currentPage === 'sales_billing' && <AccountingPage page={currentPage} jobs={jobs} onRefreshData={fetchAllData} onMarkPaid={handleMarkPaid} />}
-                    {currentPage === 'accounting_journal' && <AccountingPage page={currentPage} journalEntries={journalEntries} onAddEntry={handleAddEntry} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'purchasing_invoices' && <AccountingPage page={currentPage} onAddEntry={handleAddEntry} addToast={addToast} requestConfirmation={requestConfirmation} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'purchasing_payments' && <AccountingPage page={currentPage} journalEntries={journalEntries} onExecutePayment={handleAddEntry} />}
-                    {currentPage === 'hr_labor_cost' && <AccountingPage page={currentPage} employees={employees} />}
-                    {currentPage === 'accounting_general_ledger' && <AccountingPage page={currentPage} journalEntries={journalEntries} accountItems={accountItems} />}
-                    {currentPage === 'accounting_trial_balance' && <AccountingPage page={currentPage} journalEntries={journalEntries} />}
-                    {currentPage === 'accounting_period_closing' && <AccountingPage page={currentPage} addToast={addToast} jobs={jobs} applications={applications} journalEntries={journalEntries} onNavigate={handleNavigate} currentUser={currentUser} />}
-                    {currentPage === 'accounting_business_plan' && <BusinessPlanPage allUsers={allUsers} />}
-                    {currentPage === 'analysis_ranking' && <SalesRanking jobs={jobs} />}
-                    {currentPage === 'admin_user_management' && <UserManagementPage addToast={addToast} requestConfirmation={requestConfirmation} />}
-                    {currentPage === 'admin_route_management' && <ApprovalRouteManagementPage addToast={addToast} requestConfirmation={requestConfirmation} />}
-                    {currentPage === 'admin_bug_reports' && <BugReportList reports={bugReports} onUpdateReport={handleUpdateBugReport} searchTerm={searchTerm} />}
-                    {currentPage === 'admin_audit_log' && <AuditLogPage logs={userActivityLogs} />}
-                    {currentPage === 'admin_journal_queue' && <JournalQueuePage />}
-                    {currentPage === 'admin_master_management' && <MasterManagementPage accountItems={accountItems} paymentRecipients={paymentRecipients} allocationDivisions={allocationDivisions} departments={departments} titles={employeeTitles} onSaveAccountItem={handleSaveAccountItem} onDeleteAccountItem={handleDeleteAccountItem} onSavePaymentRecipient={handleSavePaymentRecipient} onDeletePaymentRecipient={handleDeletePaymentRecipient} onSaveAllocationDivision={handleSaveAllocationDivision} onDeleteAllocationDivision={handleDeleteAllocationDivision} onSaveDepartment={handleSaveDepartment} onDeleteDepartment={handleDeleteDepartment} onSaveTitle={handleSaveTitle} onDeleteTitle={handleDeleteTitle} addToast={addToast} requestConfirmation={requestConfirmation} />}
-                    {currentPage === 'business_support_proposal' && <BusinessSupportPage customers={customers} jobs={jobs} estimates={estimates} currentUser={currentUser} addToast={addToast} isAIOff={isAIOff} />}
-                    {currentPage === 'ai_business_consultant' && <AIChatPage currentUser={currentUser} jobs={jobs} customers={customers} journalEntries={journalEntries} />}
-                    {currentPage === 'ai_market_research' && <MarketResearchPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'ai_artifacts' && <AIArtifactsPage artifacts={aiArtifacts} allUsers={allUsers} searchTerm={searchTerm} />}
-                    {currentPage === 'ai_data_entry' && <AIDataEntryPage customers={customers} onAddLead={handleAddLead} onUpdateCustomer={handleUpdateCustomer} onAddJob={handleAddJob} addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'ai_image_studio' && <AIImageStudioPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'ai_image_generation' && <AIImageGenerationPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'ai_tts' && <AITextToSpeechPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'ai_audio_transcription' && <AIAudioTranscriptionPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'ai_video_analysis' && <AIVideoAnalysisPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'ai_video_generation' && <AIVideoGenerationPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'ai_video_transcription' && <AIVideoTranscriptionPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'ai_copywriting' && <AICopywritingPage addToast={addToast} isAIOff={isAIOff} currentUser={currentUser} />}
-                    {currentPage === 'accounting_analysis_projects' && <AnalysisProjectsPage projects={analysisProjects} onRefresh={fetchAllData} currentUser={currentUser} addToast={addToast} isAIOff={isAIOff} />}
-                    {currentPage === 'accounting_analysis_simulation' && <AnalysisSimulationPage documents={documents} scenarios={bankScenarios} simulations={bankSimulations} onRefresh={fetchAllData} currentUser={currentUser} addToast={addToast} isAIOff={isAIOff} />}
-                    {['approval_list', 'approval_form_expense', 'approval_form_transport', 'approval_form_leave', 'approval_form_approval', 'approval_form_daily', 'approval_form_weekly'].includes(currentPage) && (
-                        <ApprovalWorkflowPage 
-                            currentUser={currentUser} 
-                            view={currentPage === 'approval_list' ? 'list' : 'form'} 
-                            formCode={currentPage.replace('approval_form_', '').toUpperCase()}
-                            addToast={addToast}
-                            customers={customers}
-                            accountItems={accountItems}
-                            jobs={jobs}
-                            purchaseOrders={purchaseOrders}
-                            departments={departments}
-                            isAIOff={isAIOff}
-                            allocationDivisions={allocationDivisions}
-                            applications={applications}
-                            onRefresh={fetchAllData}
-                        />
-                    )}
-                    {currentPage === 'settings' && <SettingsPage addToast={addToast} />}
-                    {/* Placeholder for other pages */}
-                    {![
-                        'analysis_dashboard', 'sales_orders', 'sales_customers', 'sales_leads', 'sales_pipeline',
-                        'purchasing_orders', 'inventory_management', 'manufacturing_orders', 'manufacturing_progress', 'manufacturing_cost',
-                        'sales_estimates', 'sales_billing', 'accounting_journal', 'purchasing_invoices', 'purchasing_payments',
-                        'hr_labor_cost', 'accounting_general_ledger', 'accounting_trial_balance', 'accounting_period_closing',
-                        'accounting_business_plan', 'analysis_ranking', 'admin_user_management', 'admin_route_management',
-                        'admin_bug_reports', 'admin_audit_log', 'admin_journal_queue', 'admin_master_management',
-                        'business_support_proposal', 'ai_business_consultant', 'ai_market_research', 'ai_artifacts', 'ai_data_entry',
-                        'ai_image_studio', 'ai_image_generation', 'ai_tts', 'ai_audio_transcription', 'ai_video_analysis',
-                        'ai_video_generation', 'ai_video_transcription', 'ai_copywriting', 'accounting_analysis_projects',
-                        'accounting_analysis_simulation', 'settings',
-                        'approval_list', 'approval_form_expense', 'approval_form_transport', 'approval_form_leave', 'approval_form_approval', 'approval_form_daily', 'approval_form_weekly'
-                    ].includes(currentPage) && <PlaceholderPage title={pageTitle} />}
+                    {renderContent()}
                 </div>
             </main>
-
-            {/* Modals */}
             <CreateJobModal isOpen={isCreateJobModalOpen} onClose={() => setIsCreateJobModalOpen(false)} onAddJob={handleAddJob} addToast={addToast} currentUser={currentUser} />
-            <JobDetailModal job={selectedJob} isOpen={isJobDetailModalOpen} onClose={() => setIsJobDetailModalOpen(false)} onUpdateJob={handleUpdateJob} onDeleteJob={handleDeleteJob} requestConfirmation={requestConfirmation} onNavigate={handleNavigate} addToast={addToast} />
-            <CustomerDetailModal isOpen={isCustomerDetailModalOpen} customer={selectedCustomer} mode={customerDetailMode} onClose={() => setIsCustomerDetailModalOpen(false)} onSave={customerDetailMode === 'new' ? handleAddCustomer : handleUpdateCustomer} onSetMode={setCustomerDetailMode} onAnalyzeCustomer={handleAnalyzeCustomer} isAIOff={isAIOff} addToast={addToast} />
-            <CompanyAnalysisModal isOpen={isCompanyAnalysisModalOpen} onClose={() => setIsCompanyAnalysisModalOpen(false)} analysis={companyAnalysisResult} customer={selectedCustomer} isLoading={isCompanyAnalysisLoading} error={companyAnalysisError} currentUser={currentUser} isAIOff={isAIOff} onReanalyze={handleAnalyzeCustomer} />
-            <CreateLeadModal isOpen={isCreateLeadModalOpen} onClose={() => setIsCreateLeadModalOpen(false)} onAddLead={handleAddLead} addToast={addToast} />
-            <CreateInventoryItemModal isOpen={isCreateInventoryItemModalOpen} onClose={() => setIsCreateInventoryItemModalOpen(false)} onSave={selectedInventoryItem ? handleUpdateInventoryItem : handleAddInventoryItem} item={selectedInventoryItem} />
+            <JobDetailModal isOpen={isJobDetailModalOpen} onClose={() => setIsJobDetailModalOpen(false)} job={selectedJob} onUpdateJob={handleUpdateJob} onDeleteJob={handleDeleteJob} requestConfirmation={requestConfirmation} onNavigate={handleNavigate} addToast={addToast} />
+            <CustomerDetailModal isOpen={isCustomerDetailModalOpen} onClose={() => setIsCustomerDetailModalOpen(false)} customer={selectedCustomer} mode={customerDetailMode} onSave={customerDetailMode === 'new' ? handleAddCustomer : handleUpdateCustomer} onSetMode={setCustomerDetailMode} onAnalyzeCustomer={handleAnalyzeCustomer} isAIOff={isAIOff} addToast={addToast} />
+            <CreateLeadModal isOpen={isCreateLeadModalOpen} onClose={() => setIsCreateLeadModalModalOpen(false)} onAddLead={handleAddLead} addToast={addToast} />
+            <CreateInventoryItemModal isOpen={isCreateInventoryItemModalOpen} onClose={() => { setIsCreateInventoryItemModalOpen(false); setSelectedInventoryItem(null); }} onSave={handleUpdateInventoryItem} item={selectedInventoryItem} />
             <CreatePurchaseOrderModal isOpen={isCreatePurchaseOrderModalOpen} onClose={() => setIsCreatePurchaseOrderModalOpen(false)} onAddPurchaseOrder={handleAddPurchaseOrder} />
-            
             <ToastContainer toasts={toasts} onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
             <ConfirmationDialog {...confirmationDialog} />
-
-            {/* AI Chatbot Button */}
-            {!isChatbotOpen && (
-                <button 
-                    onClick={() => setIsChatbotOpen(true)} 
-                    className="fixed bottom-8 right-8 bg-blue-600 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-colors z-[90]"
-                    aria-label="Open AI Chatbot"
-                >
-                    <MessageCircle className="w-8 h-8" />
-                </button>
-            )}
             {isChatbotOpen && <Chatbot onClose={() => setIsChatbotOpen(false)} isAIOff={isAIOff} currentUser={currentUser} />}
-            
-            {/* Bug Report Chat Button */}
-            <button 
-                onClick={() => setIsBugReportChatModalOpen(true)} 
-                className="fixed bottom-8 left-8 bg-purple-600 text-white rounded-full p-4 shadow-lg hover:bg-purple-700 transition-colors z-[90]"
+            <button
+                className="fixed bottom-8 right-8 bg-blue-600 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-colors z-[90]"
+                onClick={() => setIsChatbotOpen(true)}
+                aria-label="Open AI Chatbot"
+            >
+                <MessageCircle className="w-8 h-8" />
+            </button>
+            {isBugReportChatModalOpen && <BugReportChatModal isOpen={isBugReportChatModalOpen} onClose={() => setIsBugReportChatModalOpen(false)} onReportSubmit={handleAddBugReport} isAIOff={isAIOff} />}
+            <button
+                className="fixed bottom-8 right-24 bg-purple-600 text-white rounded-full p-4 shadow-lg hover:bg-purple-700 transition-colors z-[90]"
+                onClick={() => setIsBugReportChatModalOpen(true)}
                 aria-label="Open Bug Report Chat"
             >
                 <AlertTriangle className="w-8 h-8" />
             </button>
-            <BugReportChatModal isOpen={isBugReportChatModalOpen} onClose={() => setIsBugReportChatModalOpen(false)} onReportSubmit={handleAddBugReport} isAIOff={isAIOff} />
-            
-            </main>
         </div>
     );
 };

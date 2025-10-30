@@ -572,28 +572,7 @@ export interface AnalysisProject {
   created_at: string;
 }
 
-export interface AIArtifact {
-  id: string;
-  project_id?: string; // Added missing property
-  kind: ArtifactKind;
-  title: string;
-  content_json?: any; // Added missing property
-  source_url?: string;
-  file_path?: string;
-  metrics?: any;
-  period?: any;
-  lead_id?: string | null;
-  customer_id?: string | null;
-  body_md?: string | null;
-  storage_path?: string | null;
-  status?: string;
-  created_by?: string | null;
-  created_by_user?: Pick<User, 'name'>; // Added missing property
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface Document {
+export interface AppDocument { // Renamed from Document to AppDocument to avoid global Document collision
   id: string;
   project_id: string;
   file_name: string;

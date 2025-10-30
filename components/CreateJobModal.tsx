@@ -182,7 +182,7 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onAddJ
   
   const formRowClass = "flex flex-col gap-2";
   const labelClass = "text-sm font-medium text-slate-700 dark:text-slate-300";
-  const getInputClass = (field: keyof ValidationErrors) => `w-full bg-slate-50 dark:bg-slate-700 border text-slate-900 dark:text-white rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${errors[field] ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`;
+  const getInputClass = (field: keyof ValidationErrors | undefined) => `w-full bg-slate-50 dark:bg-slate-700 border text-slate-900 dark:text-white rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${field && errors[field] ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
@@ -205,7 +205,7 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onAddJ
                         id="ai-prompt"
                         value={aiPrompt}
                         onChange={(e) => setAiPrompt(e.target.value)}
-                        placeholder="例: 株式会社ABC様のカフェオープン用A4チラシ1000枚"
+                        placeholder="例: 株式会社ABC様のカフェオープン用A5チラシ1000枚"
                         rows={3}
                         className={`${getInputClass(undefined)} flex-grow`}
                         disabled={isAiLoading || isSubmitting}
@@ -231,39 +231,43 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onAddJ
                         </button>
                     </div>
                 </div>
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div className={formRowClass}>
+                    <label htmlFor="clientName" className={labelClass}>クライアント名 *</label>
+                    <input
+                        type="text"
+                        id="clientName"
+                        name="clientName"
+                        value={formData.clientName}
+                        onChange={handleChange}
+                        className={getInputClass('clientName')}
+                        placeholder="株式会社ABC"
+                        required
+                        disabled={isSubmitting}
+                        ref={clientNameInputRef}
+                    />
+                    {errors.clientName && <p className="text-red-500 text-xs mt-1">{errors.clientName}</p>}
+                </div>
 
-            <form onSubmit={handleSubmit} className="p-6 pt-0 space-y-6 flex-1 overflow-y-auto">
+                <div className={formRowClass}>
+                    <label htmlFor="title" className={labelClass}>案件タイトル *</label>
+                    <input
+                        type="text"
+                        id="title"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleChange}
+                        className={getInputClass('title')}
+                        placeholder="カフェオープン記念 A5チラシ"
+                        required
+                        disabled={isSubmitting}
+                    />
+                    {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className={formRowClass}>
-                        <label htmlFor="clientName" className={labelClass}>クライアント名 <span className="text-red-500">*</span></label>
-                        <input
-                            type="text"
-                            id="clientName"
-                            name="clientName"
-                            ref={clientNameInputRef}
-                            value={formData.clientName}
-                            onChange={handleChange}
-                            className={getInputClass('clientName')}
-                            disabled={isAiLoading || isSubmitting}
-                        />
-                        {errors.clientName && <p className="text-red-500 text-xs mt-1">{errors.clientName}</p>}
-                    </div>
-                    <div className={formRowClass}>
-                        <label htmlFor="title" className={labelClass}>案件タイトル <span className="text-red-500">*</span></label>
-                        <input
-                            type="text"
-                            id="title"
-                            name="title"
-                            value={formData.title}
-                            onChange={handleChange}
-                            className={getInputClass('title')}
-                            disabled={isAiLoading || isSubmitting}
-                        />
-                        {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
-                    </div>
-                    <div className={formRowClass}>
-                        <label htmlFor="dueDate" className={labelClass}>納期 <span className="text-red-500">*</span></label>
+                        <label htmlFor="dueDate" className={labelClass}>納期 *</label>
                         <input
                             type="date"
                             id="dueDate"
@@ -271,48 +275,11 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onAddJ
                             value={formData.dueDate}
                             onChange={handleChange}
                             className={getInputClass('dueDate')}
-                            disabled={isAiLoading || isSubmitting}
+                            required
+                            disabled={isSubmitting}
                         />
                         {errors.dueDate && <p className="text-red-500 text-xs mt-1">{errors.dueDate}</p>}
                     </div>
-                    <div className={formRowClass}>
-                        <label htmlFor="price" className={labelClass}>売上高 (P) <span className="text-red-500">*</span></label>
-                        <input
-                            type="number"
-                            id="price"
-                            name="price"
-                            value={formData.price}
-                            onChange={handleChange}
-                            className={getInputClass('price')}
-                            disabled={isAiLoading || isSubmitting}
-                        />
-                        {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
-                    </div>
-                    <div className={formRowClass}>
-                        <label htmlFor="variableCost" className={labelClass}>変動費 (V)</label>
-                        <input
-                            type="number"
-                            id="variableCost"
-                            name="variableCost"
-                            value={formData.variableCost}
-                            onChange={handleChange}
-                            className={getInputClass(undefined)}
-                            disabled={isAiLoading || isSubmitting}
-                        />
-                    </div>
-                    <div className={formRowClass}>
-                        <label htmlFor="margin" className={labelClass}>限界利益 (M)</label>
-                        <input
-                            type="text"
-                            id="margin"
-                            value={formatJPY(formData.price - formData.variableCost)}
-                            className={`${getInputClass(undefined)} !text-blue-600 !font-semibold`}
-                            disabled
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className={formRowClass}>
                         <label htmlFor="quantity" className={labelClass}>数量</label>
                         <input
@@ -322,18 +289,22 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onAddJ
                             value={formData.quantity}
                             onChange={handleChange}
                             className={getInputClass(undefined)}
-                            disabled={isAiLoading || isSubmitting}
+                            min="1"
+                            disabled={isSubmitting}
                         />
                     </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className={formRowClass}>
-                        <label htmlFor="paperType" className={labelClass}>用紙種類</label>
+                        <label htmlFor="paperType" className={labelClass}>紙種</label>
                         <select
                             id="paperType"
                             name="paperType"
                             value={formData.paperType}
                             onChange={handleChange}
                             className={getInputClass(undefined)}
-                            disabled={isAiLoading || isSubmitting}
+                            disabled={isSubmitting}
                         >
                             {PAPER_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
                         </select>
@@ -346,9 +317,9 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onAddJ
                             value={formData.finishing}
                             onChange={handleChange}
                             className={getInputClass(undefined)}
-                            disabled={isAiLoading || isSubmitting}
+                            disabled={isSubmitting}
                         >
-                            {FINISHING_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            {FINISHING_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
                         </select>
                     </div>
                 </div>
@@ -360,12 +331,45 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onAddJ
                         name="details"
                         value={formData.details}
                         onChange={handleChange}
-                        rows={5}
                         className={getInputClass(undefined)}
-                        disabled={isAiLoading || isSubmitting}
+                        rows={3}
+                        placeholder="色、両面/片面、目的など、仕様を詳しく記述"
+                        disabled={isSubmitting}
                     />
                 </div>
-            </form>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={formRowClass}>
+                        <label htmlFor="price" className={labelClass}>売上高 (P) *</label>
+                        <input
+                            type="number"
+                            id="price"
+                            name="price"
+                            value={formData.price}
+                            onChange={handleChange}
+                            className={getInputClass('price')}
+                            min="0"
+                            required
+                            disabled={isSubmitting}
+                        />
+                        {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
+                    </div>
+                    <div className={formRowClass}>
+                        <label htmlFor="variableCost" className={labelClass}>変動費 (V)</label>
+                        <input
+                            type="number"
+                            id="variableCost"
+                            name="variableCost"
+                            value={formData.variableCost}
+                            onChange={handleChange}
+                            className={getInputClass(undefined)}
+                            min="0"
+                            disabled={isSubmitting}
+                        />
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">限界利益 (MQ): {formatJPY(formData.price - formData.variableCost)}</p>
+                    </div>
+                </div>
+                </form>
         </div>
 
         <div className="flex justify-end gap-4 p-6 border-t border-slate-200 dark:border-slate-700">
